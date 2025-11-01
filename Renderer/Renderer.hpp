@@ -12,6 +12,12 @@ public:
 	void BeginRendering();
 	void Render();
 	void Present();
+	/*
+		Creates group of meshes that will be bound together to the pipeline
+		Each mesh retains index from geometryEntries
+		On error returns 0xFFFFFFFFFFFFFFFF
+	*/
+	uint64_t CreateMeshCollection(const std::vector<GeometryEntry>& geometryEntries);
 private:
 	void CreateControllingStructs();
 	void CreateComputePipeline();
@@ -30,5 +36,6 @@ public:
 	std::vector<VkRenderPassBeginInfo> renderPassInfos;
 	std::vector<VkImageMemoryBarrier> transferBarriers;
 	std::vector<VkImageMemoryBarrier> restoreBarriers;
+	std::vector<MeshCollection> meshCollections;
 	std::vector<VulkanPipelineData> pipelines;
 };

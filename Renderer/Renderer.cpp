@@ -4,7 +4,7 @@
 #include "CommonShapes.hpp"
 using namespace std;
 #define GET_PIPELINE(type) pipelines[static_cast<uint32_t>(type)]
-
+#define GET_BASE_SHAPE(name) baseShapesTable[static_cast<uint32_t>(name)]
 enum class ComputeLayout
 {
     RenderTexture = 0,
@@ -25,6 +25,10 @@ enum class PipelineTypes
     PipelineCount
 };
 
+const Geometry* baseShapesTable[]
+{
+    &commonBox
+};
 
 Renderer::Renderer(
     HINSTANCE hinstance,
@@ -99,6 +103,69 @@ void Renderer::Present()
     info.pWaitSemaphores = &vkResources.renderingFinished;
     EXIT_ON_VK_ERROR(vkQueuePresentKHR(vkResources.presentationQueue, &info));
 
+}
+
+uint64_t Renderer::CreateMeshCollection(const std::vector<GeometryEntry>& geometryEntries)
+{
+    MeshCollection newColletion = {};
+    newColletion.vbOffset.resize(geometryEntries.size());
+    newColletion.ibOffset.resize(geometryEntries.size());
+    newColletion.indexCount.resize(geometryEntries.size());
+    size_t idx = meshCollections.size();
+
+    VkDeviceSize vbSize = 0;
+    VkDeviceSize ibSize = 0;
+    for (size_t i = 0; i < geometryEntries.size(); i++)
+    {
+        newColletion.vbOffset[i] = vbSize;
+        newColletion.ibOffset[i] = ibSize;
+
+        if (geometryEntries[i].gType == GeometryType::Mesh)
+        {
+            exitOnError(L"GeometryType::Mesh is currently not supported\n");
+        }
+        else
+        {
+            vbSize += GET_BASE_SHAPE(geometryEntries[i].gType)->vertecies->size() * sizeof(CommonVertex);
+            ibSize += GET_BASE_SHAPE(geometryEntries[i].gType)->indicies->size() * sizeof(uint16_t);
+        }
+        newColletion.indexCount[i] = ibSize - newColletion.ibOffset[i];
+    }
+
+    if (allocateBuffer(vkResources.device, vkResources.physicalDevice, vbSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &newColletion.vertexBuffer) != VK_RESOURCES_OK)
+    {
+        goto cleanup;
+    }
+
+    if (allocateBuffer(vkResources.device, vkResources.physicalDevice, ibSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &newColletion.indexBuffer) != VK_RESOURCES_OK)
+    {
+        goto cleanup;
+    }
+
+    
+    meshCollections.push_back(newColletion);
+    return idx;
+
+cleanup:
+    if (newColletion.vertexBuffer.buffer)
+    {
+        vkDestroyBuffer(vkResources.device, newColletion.vertexBuffer.buffer, nullptr);
+    }
+    if (newColletion.indexBuffer.buffer)
+    {
+        vkDestroyBuffer(vkResources.device, newColletion.indexBuffer.buffer, nullptr);
+    }
+    if (newColletion.vertexBuffer.deviceMemory)
+    {
+        vkFreeMemory(vkResources.device, newColletion.vertexBuffer.deviceMemory, nullptr);
+    }
+    if (newColletion.indexBuffer.deviceMemory)
+    {
+        vkFreeMemory(vkResources.device, newColletion.indexBuffer.deviceMemory, nullptr);
+    }
+    return 0xFFFFFFFFFFFFFFFF;
 }
 
 void Renderer::CreateControllingStructs()

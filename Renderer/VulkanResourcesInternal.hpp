@@ -61,7 +61,7 @@ static Texture createTexture2D(
 	VkFormat format,
 	VkImageUsageFlags usage);
 
-static VkDeviceMemory allocateBuffer(
+static VkDeviceMemory allocateBuffer_temp(
 	VkDevice device, 
 	VkPhysicalDevice physicalDevice,
 	VkMemoryRequirements memRequirements,

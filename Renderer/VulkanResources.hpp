@@ -3,6 +3,8 @@
 #define VK_USE_PLATFORM_WIN32_KHR
 #include <vulkan/vulkan.hpp>
 #include <inttypes.h>
+#define VK_RESOURCES_OK 0
+
 
 struct QueuesIdx
 {
@@ -23,6 +25,13 @@ struct Texture
 	VkDeviceMemory memory;
 	VkImageView texView;
 	VkDeviceSize alignment;
+};
+
+struct AllocatedBuffer
+{
+	VkBuffer buffer;
+	VkMemoryRequirements requirements;
+	VkDeviceMemory deviceMemory;
 };
 
 struct VulkanResources
@@ -58,3 +67,12 @@ int64_t createVulkanResources(
 	VulkanResources* vkResources, 
 	HINSTANCE hinstance, 
 	HWND hwnd);
+
+int64_t allocateBuffer(
+	VkDevice device, 
+	VkPhysicalDevice physicalDevice,
+	VkDeviceSize buffSize, 
+	VkBufferUsageFlags usage,
+	VkMemoryPropertyFlags memoryProps,
+	AllocatedBuffer* allocatedBuffer );
+

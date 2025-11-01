@@ -44,4 +44,4 @@ static const vector<uint16_t > boxIndicies = {
     2 + 20, 1 + 20, 0 + 20, 2 + 20, 3 + 20, 1 + 20,
 };
 
-const Geometry box{&boxVertecies, &boxIndicies};
+const Geometry commonBox{&boxVertecies, &boxIndicies};

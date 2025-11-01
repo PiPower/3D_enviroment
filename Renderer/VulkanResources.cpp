@@ -2,7 +2,7 @@
 #include "VulkanResourcesInternal.hpp"
 #include "errors.hpp"
 #pragma comment(lib,"C:\\VulkanSDK\\1.4.304.1\\Lib\\vulkan-1.lib")
-
+#define RETURN_ON_ERROR(expr){VkResult result = expr; if(result != VK_SUCCESS){return result;}}
 using namespace std;
 const static char* instExt[] = {
 					 VK_KHR_SURFACE_EXTENSION_NAME,
@@ -58,8 +58,8 @@ int64_t createVulkanResources(
 	vkResources->depthImage = bundle.depthImage;
 	vkResources->depthImageMemory = bundle.depthImageMemory;
 	vkResources->depthImageView = bundle.depthImageView;
-	vkResources->swapchainFramebuffers = createFramebuffers(vkResources->device, vkResources->renderPass, 
-										vkResources->depthImageView, textureViews, vkResources->swapchainInfo);
+	vkResources->swapchainFramebuffers = createFramebuffers(vkResources->device, vkResources->renderPass,
+		vkResources->depthImageView, textureViews, vkResources->swapchainInfo);
 
 	VkSemaphoreCreateInfo semaphoreInfo{};
 	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -96,10 +96,10 @@ int64_t createVulkanResources(
 
 	vector<VkImageMemoryBarrier> barriers;
 	barriers.resize(1 + vkResources->swapchainImages.size() * 2);
-	barriers[vkResources->swapchainImages.size()*2] = depthBarrier;
+	barriers[vkResources->swapchainImages.size() * 2] = depthBarrier;
 	for (size_t i = 0; i < vkResources->swapchainImages.size(); i++)
 	{
-		barriers[2 * i]  = {};
+		barriers[2 * i] = {};
 		barriers[2 * i].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 		barriers[2 * i].srcAccessMask = 0;
 		barriers[2 * i].dstAccessMask = 0;
@@ -142,6 +142,46 @@ int64_t createVulkanResources(
 	EXIT_ON_VK_ERROR(vkQueueWaitIdle(vkResources->graphicsQueue));
 
 	return 0;
+}
+
+int64_t allocateBuffer(
+	VkDevice device,
+	VkPhysicalDevice physicalDevice,
+	VkDeviceSize buffSize,
+	VkBufferUsageFlags usage,
+	VkMemoryPropertyFlags memoryProps,
+	AllocatedBuffer* allocatedBuffer)
+{
+	VkResult result;
+	VkBufferCreateInfo buffInfo = {};
+	buffInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	buffInfo.size = buffSize;
+	buffInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+	buffInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	RETURN_ON_ERROR(vkCreateBuffer(device, &buffInfo, nullptr, &allocatedBuffer->buffer));
+
+	vkGetBufferMemoryRequirements(device, allocatedBuffer->buffer, &allocatedBuffer->requirements);
+
+	VkPhysicalDeviceMemoryProperties memProperties;
+	vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+	uint32_t i;
+	for (i = 0; i < memProperties.memoryTypeCount; i++)
+	{
+		if ((allocatedBuffer->requirements.memoryTypeBits & (1 << i)) &&
+			(memProperties.memoryTypes[i].propertyFlags & memoryProps) == memoryProps) {
+			break;
+		}
+	}
+
+	VkMemoryAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	allocInfo.allocationSize = allocatedBuffer->requirements.size;
+	allocInfo.memoryTypeIndex = i;
+
+	RETURN_ON_ERROR(vkAllocateMemory(device, &allocInfo, nullptr, &allocatedBuffer->deviceMemory));
+	RETURN_ON_ERROR(vkBindBufferMemory(device, allocatedBuffer->buffer, allocatedBuffer->deviceMemory, 0));
+
+	return VK_RESOURCES_OK;
 }
 
 
@@ -499,7 +539,7 @@ static Texture createTexture2D(
 	VkMemoryRequirements memRequirements = {};
 	vkGetImageMemoryRequirements(device, texture.texImage, &memRequirements);
 	texture.alignment = memRequirements.alignment;
-	texture.memory = allocateBuffer(device, physicalDevice, memRequirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	texture.memory = allocateBuffer_temp(device, physicalDevice, memRequirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 	EXIT_ON_VK_ERROR(vkBindImageMemory(device, texture.texImage, texture.memory, 0));
 
@@ -517,7 +557,7 @@ static Texture createTexture2D(
 	return texture;
 }
 
-static VkDeviceMemory allocateBuffer(
+static VkDeviceMemory allocateBuffer_temp(
 	VkDevice device,
 	VkPhysicalDevice physicalDevice,
 	VkMemoryRequirements memRequirements,
@@ -712,7 +752,7 @@ static DepthBufferBundle createDepthBuffer(
 
 	VkMemoryRequirements memRequirements;
 	vkGetImageMemoryRequirements(device, bundleOut.depthImage, &memRequirements);
-	bundleOut.depthImageMemory = allocateBuffer(device, physicalDevice, memRequirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	bundleOut.depthImageMemory = allocateBuffer_temp(device, physicalDevice, memRequirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 	EXIT_ON_VK_ERROR(vkBindImageMemory(device, bundleOut.depthImage, bundleOut.depthImageMemory, 0));
 
 	VkImageViewCreateInfo viewInfo = {};

@@ -15,4 +15,4 @@ struct Geometry
     const std::vector<uint16_t>* const indicies;
 };
 
-extern const Geometry box;
+extern const Geometry commonBox;
