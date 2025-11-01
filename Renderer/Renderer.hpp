@@ -13,10 +13,12 @@ public:
 	void Render();
 	void Present();
 private:
-	void SetControllingStructs();
-	void SetupComputePipeline();
-	void SetupComputeLayout();
-	void SetupDescriptorSets();
+	void CreateControllingStructs();
+	void CreateComputePipeline();
+	void CreateComputeLayout();
+	void CreateDescriptorSets();
+	void CreateBasicGraphicsLayout();
+	void CreateBasicGraphicsPipelines();
 public:
 	uint32_t imageIndex;
 	VulkanResources vkResources;

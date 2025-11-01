@@ -20,7 +20,7 @@ enum class PipelineTypes
 {
     Compute = 0,
     Graphics,
-    GraphicsWireframe,
+    GraphicsNonFill,
     PipelineCount
 };
 
@@ -32,10 +32,13 @@ Renderer::Renderer(
 	windowHwnd(hwnd), compiler(), pipelines((size_t)PipelineTypes::PipelineCount)
 {
 	createVulkanResources(&vkResources, hinstance, windowHwnd);
-    SetControllingStructs();
-    SetupComputeLayout();
-    SetupComputePipeline();
-    SetupDescriptorSets();
+    CreateControllingStructs();
+    CreateComputeLayout();
+    CreateComputePipeline();
+    CreateBasicGraphicsLayout();
+    CreateBasicGraphicsPipelines();
+    CreateDescriptorSets();
+
 }
 
 void Renderer::BeginRendering()
@@ -97,7 +100,7 @@ void Renderer::Present()
 
 }
 
-void Renderer::SetControllingStructs()
+void Renderer::CreateControllingStructs()
 {
     static 	VkClearValue clearColor[2];
     clearColor[1].color = { {0.2f, 0.8f, 0.2f, 1.0f} };
@@ -204,7 +207,7 @@ void Renderer::SetControllingStructs()
     computeSwapchainCopy.extent = { vkResources.swapchainInfo.capabilities.currentExtent.width, vkResources.swapchainInfo.capabilities.currentExtent.height, 1 };
 }
 
-void Renderer::SetupComputePipeline()
+void Renderer::CreateComputePipeline()
 {
 
     ShaderOptions options = {};
@@ -231,7 +234,7 @@ void Renderer::SetupComputePipeline()
     vkDestroyShaderModule(vkResources.device, computeShader, nullptr);
 }
 
-void Renderer::SetupComputeLayout()
+void Renderer::CreateComputeLayout()
 {
     VkDescriptorSetLayoutBinding bindings[2] = {};
     bindings[0].binding = CL_RENDER_TEXTURE;
@@ -258,7 +261,7 @@ void Renderer::SetupComputeLayout()
     EXIT_ON_VK_ERROR(vkCreatePipelineLayout(vkResources.device, &layoutInfo, nullptr, &GET_PIPELINE(PipelineTypes::Compute).pipelineLayout));
 }
 
-void Renderer::SetupDescriptorSets()
+void Renderer::CreateDescriptorSets()
 {
     
     GET_PIPELINE(PipelineTypes::Compute).sets.resize(vkResources.renderTextures.size());
@@ -315,6 +318,49 @@ void Renderer::SetupDescriptorSets()
 
         vkUpdateDescriptorSets(vkResources.device, CL_STORAGE_IMAGES, computeWrite, 0, nullptr);
     }
+}
+
+void Renderer::CreateBasicGraphicsLayout()
+{
+    VkDescriptorSetLayoutBinding bindings[2] = {};
+    bindings[0].binding = 0;
+    bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    bindings[0].descriptorCount = 1;
+    bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings[0].pImmutableSamplers = nullptr;
+
+    bindings[1].binding = 2;
+    bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    bindings[1].descriptorCount = 1;
+    bindings[1].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings[1].pImmutableSamplers = nullptr;
+
+    VkDescriptorSetLayoutCreateInfo descSetLayoutInfo = {};
+    descSetLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    descSetLayoutInfo.bindingCount = 2;
+    descSetLayoutInfo.pBindings = bindings;
+    EXIT_ON_VK_ERROR(vkCreateDescriptorSetLayout(vkResources.device, &descSetLayoutInfo, nullptr, 
+                                            &GET_PIPELINE(PipelineTypes::Graphics).descriptorSetLayout));
+    EXIT_ON_VK_ERROR(vkCreateDescriptorSetLayout(vkResources.device, &descSetLayoutInfo, nullptr, 
+                                        &GET_PIPELINE(PipelineTypes::GraphicsNonFill).descriptorSetLayout));
+
+    VkPipelineLayoutCreateInfo layoutInfoGraphics = {};
+    layoutInfoGraphics.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    layoutInfoGraphics.setLayoutCount = 1;
+    layoutInfoGraphics.pSetLayouts = &GET_PIPELINE(PipelineTypes::Graphics).descriptorSetLayout;
+    EXIT_ON_VK_ERROR(vkCreatePipelineLayout(vkResources.device, &layoutInfoGraphics, nullptr, &GET_PIPELINE(PipelineTypes::Graphics).pipelineLayout));
+
+    VkPipelineLayoutCreateInfo layoutInfoGraphicsNonFill = {};
+    layoutInfoGraphicsNonFill.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    layoutInfoGraphicsNonFill.setLayoutCount = 1;
+    layoutInfoGraphicsNonFill.pSetLayouts = &GET_PIPELINE(PipelineTypes::GraphicsNonFill).descriptorSetLayout;
+    EXIT_ON_VK_ERROR(vkCreatePipelineLayout(vkResources.device, &layoutInfoGraphicsNonFill, nullptr, &GET_PIPELINE(PipelineTypes::GraphicsNonFill).pipelineLayout));
+}
+
+void Renderer::CreateBasicGraphicsPipelines()
+{
+
+
 }
 
 

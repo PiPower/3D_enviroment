@@ -25,13 +25,19 @@ struct MeshCollection
 
 enum class GeometryType
 {
+	//built in meshes
 	Box,
+	//mesh is user provided mesh
 	Mesh,
 };
 
+/*
+	When vertexBuffer and indexBuffer are not used when gType == built-in type.
+*/
 struct GeometryEntry
 {
 	GeometryType gType;
-	uint32_t vertexCount;
+	char* vertexBuffer;
+	char* indexBuffer;
 };
 

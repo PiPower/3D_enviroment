@@ -65,5 +65,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\post_process.comp" />
+    <None Include="shaders\basic.vert" />
+    <None Include="shaders\basic.frag" />
   </ItemGroup>
 </Project>
