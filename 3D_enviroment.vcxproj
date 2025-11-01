@@ -156,6 +156,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Renderer\CommonShapes.cpp" />
     <ClCompile Include="Renderer\Renderer.cpp" />
     <ClCompile Include="Renderer\errors.cpp" />
     <ClCompile Include="Renderer\VulkanResources.cpp" />
@@ -163,6 +164,7 @@
     <ClCompile Include="window.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Renderer\CommonShapes.hpp" />
     <ClInclude Include="Renderer\GraphicsTypes.hpp" />
     <ClInclude Include="Renderer\Renderer.hpp" />
     <ClInclude Include="Renderer\errors.hpp" />
