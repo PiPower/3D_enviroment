@@ -2,7 +2,7 @@
 #include "VulkanResourcesInternal.hpp"
 #include "errors.hpp"
 using namespace std;
-
+#define GET_PIPELINE(type) pipelines[static_cast<uint32_t>(type)]
 
 enum class ComputeLayout
 {
@@ -15,11 +15,21 @@ static constexpr uint32_t CL_RENDER_TEXTURE = static_cast<uint32_t>(ComputeLayou
 static constexpr uint32_t CL_COMPUTE_TEXTURE = static_cast<uint32_t>(ComputeLayout::ComputeTexture);
 static constexpr uint32_t CL_STORAGE_IMAGES = static_cast<uint32_t>(ComputeLayout::StorageImageCount);
 
+
+enum class PipelineTypes
+{
+    Compute = 0,
+    Graphics,
+    GraphicsWireframe,
+    PipelineCount
+};
+
+
 Renderer::Renderer(
     HINSTANCE hinstance,
     HWND hwnd)
 	:
-	windowHwnd(hwnd), compiler()
+	windowHwnd(hwnd), compiler(), pipelines((size_t)PipelineTypes::PipelineCount)
 {
 	createVulkanResources(&vkResources, hinstance, windowHwnd);
     SetControllingStructs();
@@ -50,8 +60,9 @@ void Renderer::Render()
     vkCmdPipelineBarrier(vkResources.cmdBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 
                                                                                                      0, 0, nullptr, 0, nullptr, 0, nullptr);
 
-    vkCmdBindPipeline(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute.pipeline);
-    vkCmdBindDescriptorSets(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute.pipelineLayout, 0, 1, &compute.sets[imageIndex], 0, nullptr);
+    vkCmdBindPipeline(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, GET_PIPELINE(PipelineTypes::Compute).pipeline);
+    vkCmdBindDescriptorSets(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, GET_PIPELINE(PipelineTypes::Compute).pipelineLayout, 
+                                                                0, 1, &GET_PIPELINE(PipelineTypes::Compute).sets[imageIndex], 0, nullptr);
 
     uint32_t x_dispatch = vkResources.swapchainInfo.capabilities.currentExtent.width;
     uint32_t y_dispatch = vkResources.swapchainInfo.capabilities.currentExtent.height;
@@ -210,12 +221,12 @@ void Renderer::SetupComputePipeline()
 
     VkComputePipelineCreateInfo computeInfo = {};
     computeInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-    computeInfo.layout = compute.pipelineLayout;
+    computeInfo.layout = GET_PIPELINE(PipelineTypes::Compute).pipelineLayout;
     computeInfo.stage = shaderInfo;
     computeInfo.basePipelineHandle = VK_NULL_HANDLE;
     computeInfo.basePipelineIndex = -1;
 
-    EXIT_ON_VK_ERROR(vkCreateComputePipelines(vkResources.device, VK_NULL_HANDLE, 1, &computeInfo, nullptr, &compute.pipeline));
+    EXIT_ON_VK_ERROR(vkCreateComputePipelines(vkResources.device, VK_NULL_HANDLE, 1, &computeInfo, nullptr, &GET_PIPELINE(PipelineTypes::Compute).pipeline));
 
     vkDestroyShaderModule(vkResources.device, computeShader, nullptr);
 }
@@ -237,21 +248,20 @@ void Renderer::SetupComputeLayout()
     setInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     setInfo.bindingCount = 2;
     setInfo.pBindings = bindings;
-
-    EXIT_ON_VK_ERROR(vkCreateDescriptorSetLayout(vkResources.device, &setInfo, nullptr, &compute.descriptorSetLayout));
+    EXIT_ON_VK_ERROR(vkCreateDescriptorSetLayout(vkResources.device, &setInfo, nullptr, &GET_PIPELINE(PipelineTypes::Compute).descriptorSetLayout));
 
     VkPipelineLayoutCreateInfo layoutInfo = {};
     layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     layoutInfo.setLayoutCount = 1;
-    layoutInfo.pSetLayouts = &compute.descriptorSetLayout;
+    layoutInfo.pSetLayouts = &GET_PIPELINE(PipelineTypes::Compute).descriptorSetLayout;
 
-    EXIT_ON_VK_ERROR(vkCreatePipelineLayout(vkResources.device, &layoutInfo, nullptr, &compute.pipelineLayout));
+    EXIT_ON_VK_ERROR(vkCreatePipelineLayout(vkResources.device, &layoutInfo, nullptr, &GET_PIPELINE(PipelineTypes::Compute).pipelineLayout));
 }
 
 void Renderer::SetupDescriptorSets()
 {
-
-    compute.sets.resize(vkResources.renderTextures.size());
+    
+    GET_PIPELINE(PipelineTypes::Compute).sets.resize(vkResources.renderTextures.size());
 
     VkDescriptorPoolSize poolSize[1] = {};
     poolSize[0].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
@@ -264,7 +274,7 @@ void Renderer::SetupDescriptorSets()
     poolDesc.pPoolSizes = poolSize;
     EXIT_ON_VK_ERROR(vkCreateDescriptorPool(vkResources.device, &poolDesc, nullptr, &pipelinesPool));
 
-    vector<VkDescriptorSetLayout> layouts(vkResources.renderTextures.size(), compute.descriptorSetLayout);
+    vector<VkDescriptorSetLayout> layouts(vkResources.renderTextures.size(), GET_PIPELINE(PipelineTypes::Compute).descriptorSetLayout);
     vector<VkDescriptorSet> sets(vkResources.renderTextures.size());
     VkDescriptorSetAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -273,7 +283,7 @@ void Renderer::SetupDescriptorSets()
     allocInfo.pSetLayouts = layouts.data();
 
     EXIT_ON_VK_ERROR(vkAllocateDescriptorSets(vkResources.device, &allocInfo, sets.data()));
-    copy(sets.begin(), sets.begin() + vkResources.renderTextures.size(), compute.sets.begin());
+    copy(sets.begin(), sets.begin() + vkResources.renderTextures.size(), GET_PIPELINE(PipelineTypes::Compute).sets.begin());
 
     for (size_t i = 0; i < vkResources.renderTextures.size(); i++)
     {
@@ -288,7 +298,7 @@ void Renderer::SetupDescriptorSets()
 
         VkWriteDescriptorSet computeWrite[CL_STORAGE_IMAGES] = {};
         computeWrite[CL_RENDER_TEXTURE].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        computeWrite[CL_RENDER_TEXTURE].dstSet = compute.sets[i];
+        computeWrite[CL_RENDER_TEXTURE].dstSet = GET_PIPELINE(PipelineTypes::Compute).sets[i];
         computeWrite[CL_RENDER_TEXTURE].dstBinding = CL_RENDER_TEXTURE;
         computeWrite[CL_RENDER_TEXTURE].dstArrayElement = 0;
         computeWrite[CL_RENDER_TEXTURE].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
@@ -296,7 +306,7 @@ void Renderer::SetupDescriptorSets()
         computeWrite[CL_RENDER_TEXTURE].pImageInfo = &computeImgInfo[CL_RENDER_TEXTURE];
 
         computeWrite[CL_COMPUTE_TEXTURE].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        computeWrite[CL_COMPUTE_TEXTURE].dstSet = compute.sets[i];
+        computeWrite[CL_COMPUTE_TEXTURE].dstSet = GET_PIPELINE(PipelineTypes::Compute).sets[i];
         computeWrite[CL_COMPUTE_TEXTURE].dstBinding = CL_COMPUTE_TEXTURE;
         computeWrite[CL_COMPUTE_TEXTURE].dstArrayElement = 0;
         computeWrite[CL_COMPUTE_TEXTURE].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;

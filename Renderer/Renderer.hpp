@@ -1,27 +1,7 @@
 #pragma once
 #include "VulkanResources.hpp"
 #include "ShaderCompiler.hpp"
-
-struct VulkanPipelineData
-{
-	VkPipeline pipeline;
-	VkDescriptorSetLayout descriptorSetLayout;
-	VkPipelineLayout pipelineLayout;
-	std::vector<VkDescriptorSet> sets;
-};
-
-struct MeshCollection
-{
-	VkBuffer vertexBuffer;
-	VkDeviceMemory vbDevMem;
-	VkBuffer indexBuffer;
-	VkDeviceMemory ibDevMem;
-	std::vector<uint32_t> vbOffset;
-	std::vector<uint32_t> ibOffset;
-	std::vector<uint32_t> indexCount;
-	std::vector<uint32_t> materialIndex;
-};
-
+#include "GraphicsTypes.hpp"
 
 class Renderer
 {
@@ -32,7 +12,6 @@ public:
 	void BeginRendering();
 	void Render();
 	void Present();
-	void CreateMeshCollection();
 private:
 	void SetControllingStructs();
 	void SetupComputePipeline();
@@ -43,11 +22,11 @@ public:
 	VulkanResources vkResources;
 	HWND windowHwnd;
 	VkSubmitInfo submitInfo;
+	ShaderCompiler compiler;
+	VkDescriptorPool pipelinesPool;
+	VkImageCopy computeSwapchainCopy;
 	std::vector<VkRenderPassBeginInfo> renderPassInfos;
 	std::vector<VkImageMemoryBarrier> transferBarriers;
 	std::vector<VkImageMemoryBarrier> restoreBarriers;
-	ShaderCompiler compiler;
-	VulkanPipelineData compute;
-	VkDescriptorPool pipelinesPool;
-	VkImageCopy computeSwapchainCopy;
+	std::vector<VulkanPipelineData> pipelines;
 };

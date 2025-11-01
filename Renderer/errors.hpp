@@ -1,3 +1,4 @@
+#pragma once
 #include <vulkan/vulkan.h>
 
 #define EXIT_ON_VK_ERROR(result) exitOnVkError(result)

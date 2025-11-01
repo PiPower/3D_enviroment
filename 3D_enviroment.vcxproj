@@ -163,6 +163,7 @@
     <ClCompile Include="window.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Renderer\GraphicsTypes.hpp" />
     <ClInclude Include="Renderer\Renderer.hpp" />
     <ClInclude Include="Renderer\errors.hpp" />
     <ClInclude Include="Renderer\VulkanResources.hpp" />
