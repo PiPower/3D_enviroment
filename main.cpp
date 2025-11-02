@@ -13,7 +13,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
     while (wnd.ProcessMessages() == 0)
     {
         renderer.BeginRendering();
-        renderer.Render();
+        renderer.Render(testCollection, 1, {});
         renderer.Present();
     }
 

@@ -3,14 +3,26 @@
 #include "ShaderCompiler.hpp"
 #include "GraphicsTypes.hpp"
 
+enum class PipelineTypes
+{
+	Compute = 0,
+	Graphics,
+	GraphicsNonFill
+};
+
+
 class Renderer
 {
 public:
 	Renderer(
 		HINSTANCE hinstance, 
-		HWND hwnd);
+		HWND hwnd,
+		VkDeviceSize uboPoolSize = 1'000'000,
+		VkDeviceSize stagingSize = 1'000'000);
 	void BeginRendering();
-	void Render();
+	void UpdateCamera(const Camera* ptr);
+	uint64_t CreateRenderItem(uint64_t size);
+	void Render(uint64_t meshCollectionIdx, uint64_t pipelineIdx, std::vector<uint64_t> renderItems);
 	void Present();
 	/*
 		Creates group of meshes that will be bound together to the pipeline
@@ -33,6 +45,8 @@ public:
 	ShaderCompiler compiler;
 	VkDescriptorPool pipelinesPool;
 	VkImageCopy computeSwapchainCopy;
+	AllocatedBuffer stagingBuffer;
+	char* stagingPtr;
 	std::vector<VkRenderPassBeginInfo> renderPassInfos;
 	std::vector<VkImageMemoryBarrier> transferBarriers;
 	std::vector<VkImageMemoryBarrier> restoreBarriers;

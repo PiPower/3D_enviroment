@@ -34,6 +34,12 @@ struct AllocatedBuffer
 	VkDeviceMemory deviceMemory;
 };
 
+struct CpuBuffer
+{
+	const char* data;
+	VkDeviceSize size;
+};
+
 struct VulkanResources
 {
 	VkInstance instance;
@@ -42,6 +48,7 @@ struct VulkanResources
 	VkSurfaceKHR surface;
 	QueuesIdx queueFamilies;
 	VkQueue graphicsQueue;
+	VkQueue sideQueue;
 	VkQueue presentationQueue;
 	VkDebugUtilsMessengerEXT debug;
 	SwapchainInfo swapchainInfo;
@@ -56,6 +63,7 @@ struct VulkanResources
 	VkDeviceMemory depthImageMemory;
 	VkImageView depthImageView;
 	VkCommandPool cmdPool;
+	VkCommandBuffer sideCmdBuffer;
 	VkCommandBuffer cmdBuffer;
 	VkRenderPass renderPass;
 	VkSemaphore imgReady;
@@ -68,7 +76,7 @@ int64_t createVulkanResources(
 	HINSTANCE hinstance, 
 	HWND hwnd);
 
-int64_t allocateBuffer(
+VkResult allocateBuffer(
 	VkDevice device, 
 	VkPhysicalDevice physicalDevice,
 	VkDeviceSize buffSize, 
@@ -76,3 +84,20 @@ int64_t allocateBuffer(
 	VkMemoryPropertyFlags memoryProps,
 	AllocatedBuffer* allocatedBuffer );
 
+VkResult uploadStagingData(
+	VkCommandBuffer cmdBuffer,
+	VkQueue executionQueue,
+	VkBuffer stagingBuffer,
+	char* stagingBufferPtr,
+	VkDeviceSize stagingSize,
+	VkBuffer destinationBuffer,
+	const std::vector<CpuBuffer>& buffers);
+
+VkResult performBufferCopy(
+	VkCommandBuffer cmdBuffer,
+	VkQueue executionQueue,
+	VkBuffer srcBuffer,
+	VkBuffer dstBuffer,
+	VkDeviceSize size,
+	VkDeviceSize srcOffset = 0,
+	VkDeviceSize dstOffset = 0);

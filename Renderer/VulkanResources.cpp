@@ -28,6 +28,7 @@ int64_t createVulkanResources(
 	vkResources->queueFamilies = createQueueIndecies(vkResources->instance, vkResources->physicalDevice, vkResources->surface);
 	vkResources->device = createLogicalDevice(vkResources->physicalDevice, vkResources->queueFamilies);
 	vkGetDeviceQueue(vkResources->device, vkResources->queueFamilies.grahicsIdx, 0, &vkResources->graphicsQueue);
+	vkGetDeviceQueue(vkResources->device, vkResources->queueFamilies.grahicsIdx, 1, &vkResources->sideQueue);
 	vkGetDeviceQueue(vkResources->device, vkResources->queueFamilies.presentationIdx, 0, &vkResources->presentationQueue);
 	vkResources->swapchainInfo = querySwapChainSupport(vkResources->physicalDevice, vkResources->surface);
 	vkResources->swapchain = createSwapchain(vkResources->device, vkResources->surface, vkResources->swapchainInfo,
@@ -52,7 +53,9 @@ int64_t createVulkanResources(
 	}
 
 	vkResources->cmdPool = createCommandPool(vkResources->device, vkResources->queueFamilies.grahicsIdx);
-	vkResources->cmdBuffer = createCommandBuffers(vkResources->device, vkResources->cmdPool, 1)[0];
+	vector<VkCommandBuffer> cmdBuffs = createCommandBuffers(vkResources->device, vkResources->cmdPool, 2);
+	vkResources->cmdBuffer = cmdBuffs[0];
+	vkResources->sideCmdBuffer = cmdBuffs[1];
 	vkResources->renderPass = createRenderPass(vkResources->device, VK_FORMAT_R8G8B8A8_UNORM);
 	DepthBufferBundle bundle = createDepthBuffer(vkResources->device, vkResources->physicalDevice, vkResources->swapchainInfo);
 	vkResources->depthImage = bundle.depthImage;
@@ -144,7 +147,7 @@ int64_t createVulkanResources(
 	return 0;
 }
 
-int64_t allocateBuffer(
+VkResult allocateBuffer(
 	VkDevice device,
 	VkPhysicalDevice physicalDevice,
 	VkDeviceSize buffSize,
@@ -156,7 +159,7 @@ int64_t allocateBuffer(
 	VkBufferCreateInfo buffInfo = {};
 	buffInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	buffInfo.size = buffSize;
-	buffInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+	buffInfo.usage = usage;
 	buffInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	RETURN_ON_ERROR(vkCreateBuffer(device, &buffInfo, nullptr, &allocatedBuffer->buffer));
 
@@ -181,7 +184,84 @@ int64_t allocateBuffer(
 	RETURN_ON_ERROR(vkAllocateMemory(device, &allocInfo, nullptr, &allocatedBuffer->deviceMemory));
 	RETURN_ON_ERROR(vkBindBufferMemory(device, allocatedBuffer->buffer, allocatedBuffer->deviceMemory, 0));
 
-	return VK_RESOURCES_OK;
+	return VK_SUCCESS;
+}
+
+
+VkResult uploadStagingData(
+	VkCommandBuffer cmdBuffer, 
+	VkQueue executionQueue, 
+	VkBuffer stagingBuffer,
+	char* stagingBufferPtr,
+	VkDeviceSize stagingSize, 
+	VkBuffer destinationBuffer,
+	const std::vector<CpuBuffer>& buffers)
+{
+
+	VkDeviceSize currentBufferSize = 0;
+	VkDeviceSize uploadedData = 0;
+	for (size_t i = 0; i < buffers.size(); i++)
+	{
+		const CpuBuffer* buffer = &buffers[i];
+		VkDeviceSize inBufferOffset = 0;
+		while (buffer->size - inBufferOffset > 0)
+		{
+			if (currentBufferSize == stagingSize)
+			{
+				RETURN_ON_ERROR(performBufferCopy(cmdBuffer, executionQueue, stagingBuffer, destinationBuffer, currentBufferSize, 0, uploadedData));
+				uploadedData += currentBufferSize;
+				currentBufferSize = 0;
+			}
+
+
+			VkDeviceSize uploadSize = min(buffer->size - inBufferOffset, stagingSize - currentBufferSize);
+			memcpy(stagingBufferPtr + currentBufferSize, buffer->data + inBufferOffset, uploadSize);
+			currentBufferSize += uploadSize;
+			inBufferOffset += uploadSize;
+		}
+
+	}
+
+	if (currentBufferSize > 0)
+	{
+		RETURN_ON_ERROR(performBufferCopy(cmdBuffer, executionQueue, stagingBuffer, destinationBuffer, currentBufferSize, 0, uploadedData));
+		uploadedData += currentBufferSize;
+		currentBufferSize = 0;
+	}
+
+	return VK_SUCCESS;
+}
+
+VkResult performBufferCopy(
+	VkCommandBuffer cmdBuffer,
+	VkQueue executionQueue,
+	VkBuffer srcBuffer, 
+	VkBuffer dstBuffer, 
+	VkDeviceSize size,
+	VkDeviceSize srcOffset,
+	VkDeviceSize dstOffset)
+{
+	VkBufferCopy copy;
+	copy.size = size;
+	copy.srcOffset = srcOffset;
+	copy.dstOffset = dstOffset;
+	// transition all required resources 
+	VkCommandBufferBeginInfo cmdBuffInfo = {};
+	cmdBuffInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	cmdBuffInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+	RETURN_ON_ERROR(vkResetCommandBuffer(cmdBuffer, 0));
+	RETURN_ON_ERROR(vkBeginCommandBuffer(cmdBuffer, &cmdBuffInfo));
+
+	vkCmdCopyBuffer(cmdBuffer, srcBuffer, dstBuffer, 1, &copy);
+
+	RETURN_ON_ERROR(vkEndCommandBuffer(cmdBuffer));
+	VkSubmitInfo submitInfo = {};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &cmdBuffer;
+	RETURN_ON_ERROR(vkQueueSubmit(executionQueue, 1, &submitInfo, nullptr));
+	RETURN_ON_ERROR(vkQueueWaitIdle(executionQueue));
+
 }
 
 
@@ -368,7 +448,7 @@ static VkDevice createLogicalDevice(
 	VkDeviceQueueCreateInfo queueInfos[2] = {};
 	queueInfos[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 	queueInfos[0].queueFamilyIndex = queuesIdx.grahicsIdx;
-	queueInfos[0].queueCount = 1;
+	queueInfos[0].queueCount = 2;
 	queueInfos[0].pQueuePriorities = prioGfx;
 	if (queuesIdx.grahicsIdx != queuesIdx.presentationIdx)
 	{

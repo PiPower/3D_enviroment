@@ -17,14 +17,6 @@ static constexpr uint32_t CL_COMPUTE_TEXTURE = static_cast<uint32_t>(ComputeLayo
 static constexpr uint32_t CL_STORAGE_IMAGES = static_cast<uint32_t>(ComputeLayout::StorageImageCount);
 
 
-enum class PipelineTypes
-{
-    Compute = 0,
-    Graphics,
-    GraphicsNonFill,
-    PipelineCount
-};
-
 const Geometry* baseShapesTable[]
 {
     &commonBox
@@ -32,11 +24,18 @@ const Geometry* baseShapesTable[]
 
 Renderer::Renderer(
     HINSTANCE hinstance,
-    HWND hwnd)
+    HWND hwnd,
+    VkDeviceSize uboPoolSize,
+    VkDeviceSize stagingSize)
 	:
-	windowHwnd(hwnd), compiler(), pipelines((size_t)PipelineTypes::PipelineCount)
+	windowHwnd(hwnd), compiler(), pipelines(3)
 {
 	createVulkanResources(&vkResources, hinstance, windowHwnd);
+
+    int64_t errCode = allocateBuffer(vkResources.device, vkResources.physicalDevice, stagingSize, 
+                VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &stagingBuffer);
+    EXIT_ON_VK_ERROR(vkMapMemory(vkResources.device, stagingBuffer.deviceMemory, 0, stagingBuffer.requirements.size, 0, (void**) & stagingPtr));
+
     CreateControllingStructs();
     CreateComputeLayout();
     CreateComputePipeline();
@@ -51,10 +50,7 @@ void Renderer::BeginRendering()
     EXIT_ON_VK_ERROR(vkWaitForFences(vkResources.device, 1, &vkResources.gfxQueueFinished, VK_TRUE, UINT64_MAX));
     EXIT_ON_VK_ERROR(vkResetFences(vkResources.device, 1, &vkResources.gfxQueueFinished));
     EXIT_ON_VK_ERROR(vkAcquireNextImageKHR(vkResources.device, vkResources.swapchain, UINT64_MAX, vkResources.imgReady, VK_NULL_HANDLE, &imageIndex));
-}
 
-void Renderer::Render()
-{
     VkCommandBufferBeginInfo cmdBuffInfo = {};
     cmdBuffInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     cmdBuffInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
@@ -62,38 +58,59 @@ void Renderer::Render()
     EXIT_ON_VK_ERROR(vkBeginCommandBuffer(vkResources.cmdBuffer, &cmdBuffInfo));
 
     vkCmdBeginRenderPass(vkResources.cmdBuffer, &renderPassInfos[imageIndex], VK_SUBPASS_CONTENTS_INLINE);
+}
+
+void Renderer::UpdateCamera(const Camera* ptr)
+{
+}
+
+uint64_t Renderer::CreateRenderItem(uint64_t size)
+{
+    return 0;
+}
+
+
+void Renderer::Render(uint64_t meshCollectionIdx, uint64_t pipelineIdx, std::vector<uint64_t> renderItems)
+{
+    vkCmdBindPipeline(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines[pipelineIdx].pipeline);
+    VkDeviceSize offsets[] = { 0 };
+    vkCmdBindVertexBuffers(vkResources.cmdBuffer, 0, 1, &meshCollections[meshCollectionIdx].vertexBuffer.buffer, offsets);
+    vkCmdBindIndexBuffer(vkResources.cmdBuffer, meshCollections[meshCollectionIdx].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT16);
+
+}
+
+
+
+void Renderer::Present()
+{
     vkCmdEndRenderPass(vkResources.cmdBuffer);
 
-
-    vkCmdPipelineBarrier(vkResources.cmdBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 
-                                                                                                     0, 0, nullptr, 0, nullptr, 0, nullptr);
+    vkCmdPipelineBarrier(vkResources.cmdBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        0, 0, nullptr, 0, nullptr, 0, nullptr);
 
     vkCmdBindPipeline(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, GET_PIPELINE(PipelineTypes::Compute).pipeline);
-    vkCmdBindDescriptorSets(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, GET_PIPELINE(PipelineTypes::Compute).pipelineLayout, 
-                                                                0, 1, &GET_PIPELINE(PipelineTypes::Compute).sets[imageIndex], 0, nullptr);
+    vkCmdBindDescriptorSets(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, GET_PIPELINE(PipelineTypes::Compute).pipelineLayout,
+        0, 1, &GET_PIPELINE(PipelineTypes::Compute).sets[imageIndex], 0, nullptr);
 
     uint32_t x_dispatch = vkResources.swapchainInfo.capabilities.currentExtent.width;
     uint32_t y_dispatch = vkResources.swapchainInfo.capabilities.currentExtent.height;
 
     vkCmdDispatch(vkResources.cmdBuffer, x_dispatch, y_dispatch, 1);
 
-    vkCmdPipelineBarrier(vkResources.cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 
-                                                    0, 0, nullptr, 0, nullptr, 2, transferBarriers.data() + imageIndex * 2);
+    vkCmdPipelineBarrier(vkResources.cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+        0, 0, nullptr, 0, nullptr, 2, transferBarriers.data() + imageIndex * 2);
 
     vkCmdCopyImage(vkResources.cmdBuffer, vkResources.computeTextures[imageIndex].texImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                                        vkResources.swapchainImages[imageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &computeSwapchainCopy);
+        vkResources.swapchainImages[imageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &computeSwapchainCopy);
 
 
     vkCmdPipelineBarrier(vkResources.cmdBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                                                      0, 0, nullptr, 0, nullptr, 2, restoreBarriers.data() + imageIndex * 2);
+        0, 0, nullptr, 0, nullptr, 2, restoreBarriers.data() + imageIndex * 2);
 
     EXIT_ON_VK_ERROR(vkEndCommandBuffer(vkResources.cmdBuffer));
     vkQueueSubmit(vkResources.graphicsQueue, 1, &submitInfo, vkResources.gfxQueueFinished);
 
-}
 
-void Renderer::Present()
-{
     VkPresentInfoKHR info = {};
     info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     info.swapchainCount = 1;
@@ -108,6 +125,8 @@ void Renderer::Present()
 uint64_t Renderer::CreateMeshCollection(const std::vector<GeometryEntry>& geometryEntries)
 {
     MeshCollection newColletion = {};
+    vector<CpuBuffer> vertexBuffers(geometryEntries.size());
+    vector<CpuBuffer> indexBuffers(geometryEntries.size());
     newColletion.vbOffset.resize(geometryEntries.size());
     newColletion.ibOffset.resize(geometryEntries.size());
     newColletion.indexCount.resize(geometryEntries.size());
@@ -128,23 +147,33 @@ uint64_t Renderer::CreateMeshCollection(const std::vector<GeometryEntry>& geomet
         {
             vbSize += GET_BASE_SHAPE(geometryEntries[i].gType)->vertecies->size() * sizeof(CommonVertex);
             ibSize += GET_BASE_SHAPE(geometryEntries[i].gType)->indicies->size() * sizeof(uint16_t);
+
+            vertexBuffers[i] = {(const char*)GET_BASE_SHAPE(geometryEntries[i].gType)->vertecies->data(),
+                                GET_BASE_SHAPE(geometryEntries[i].gType)->vertecies->size() * sizeof(CommonVertex) };
+            indexBuffers[i] = { (const char*)GET_BASE_SHAPE(geometryEntries[i].gType)->indicies->data(),
+                               GET_BASE_SHAPE(geometryEntries[i].gType)->indicies->size() * sizeof(uint16_t) };
         }
         newColletion.indexCount[i] = ibSize - newColletion.ibOffset[i];
     }
 
-    if (allocateBuffer(vkResources.device, vkResources.physicalDevice, vbSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+    if(allocateBuffer(vkResources.device, vkResources.physicalDevice, vbSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &newColletion.vertexBuffer) != VK_RESOURCES_OK)
     {
         goto cleanup;
     }
 
-    if (allocateBuffer(vkResources.device, vkResources.physicalDevice, ibSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &newColletion.indexBuffer) != VK_RESOURCES_OK)
+    if(allocateBuffer(vkResources.device, vkResources.physicalDevice, ibSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &newColletion.indexBuffer) != VK_RESOURCES_OK)
     {
         goto cleanup;
     }
 
-    
+    EXIT_ON_VK_ERROR(uploadStagingData(vkResources.sideCmdBuffer, vkResources.sideQueue, stagingBuffer.buffer, stagingPtr,
+        stagingBuffer.requirements.size, newColletion.vertexBuffer.buffer, vertexBuffers));
+
+    EXIT_ON_VK_ERROR(uploadStagingData(vkResources.sideCmdBuffer, vkResources.sideQueue, stagingBuffer.buffer, stagingPtr,
+        stagingBuffer.requirements.size, newColletion.indexBuffer.buffer, indexBuffers));
+
     meshCollections.push_back(newColletion);
     return idx;
 

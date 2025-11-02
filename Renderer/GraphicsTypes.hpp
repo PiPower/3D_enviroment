@@ -2,6 +2,7 @@
 #include "VulkanResources.hpp"
 #include <vulkan/vulkan.h>
 #include <vector>
+#include <DirectXMath.h>
 
 struct VulkanPipelineData
 {
@@ -47,3 +48,14 @@ struct GeometryEntry
 	uint32_t indexCount;
 };
 
+struct Camera 
+{
+	DirectX::XMMATRIX view;
+	DirectX::XMMATRIX proj;
+};
+
+struct UboPool
+{
+	AllocatedBuffer baseBuffer;
+	std::vector<VkBuffer> uboBuffers;
+};
