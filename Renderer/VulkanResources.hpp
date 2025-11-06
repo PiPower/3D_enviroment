@@ -34,6 +34,17 @@ struct AllocatedBuffer
 	VkDeviceMemory deviceMemory;
 };
 
+struct MemoryPool
+{
+	VkDeviceMemory deviceMemory;
+	std::vector<VkBuffer> boundBuffers;
+	std::vector<VkBufferCreateInfo> bufferInfos;
+	std::vector<VkMemoryRequirements> resourceReqs;
+	VkDeviceSize poolSize;
+	VkDeviceSize maxAlignment;
+	VkDeviceSize currOffset;
+};
+
 struct CpuBuffer
 {
 	const char* data;
@@ -101,3 +112,26 @@ VkResult performBufferCopy(
 	VkDeviceSize size,
 	VkDeviceSize srcOffset = 0,
 	VkDeviceSize dstOffset = 0);
+
+VkResult allocateMemoryPool(
+	VkDevice device,
+	VkPhysicalDevice physicalDevice,
+	VkDeviceSize poolSize,
+	const std::vector<VkDeviceSize>& bufferSizes,
+	const std::vector<VkBufferUsageFlags>& flags,
+	VkMemoryPropertyFlags usageFlags,
+	MemoryPool* pool);
+
+VkResult createBufferInPool(
+	size_t resourceIdx,
+	VkDevice device,
+	MemoryPool* pool
+);
+
+VkResult getBufferMemoryRequirements(
+	VkDevice device,
+	VkDeviceSize size,
+	VkBufferUsageFlags usageFlags,
+	VkMemoryRequirements* reqs,
+	VkBuffer* buffer = nullptr
+);

@@ -25,7 +25,6 @@ const Geometry* baseShapesTable[]
 Renderer::Renderer(
     HINSTANCE hinstance,
     HWND hwnd,
-    VkDeviceSize uboPoolSize,
     VkDeviceSize stagingSize)
 	:
 	windowHwnd(hwnd), compiler(), pipelines(3)
@@ -35,7 +34,6 @@ Renderer::Renderer(
     int64_t errCode = allocateBuffer(vkResources.device, vkResources.physicalDevice, stagingSize, 
                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &stagingBuffer);
     EXIT_ON_VK_ERROR(vkMapMemory(vkResources.device, stagingBuffer.deviceMemory, 0, stagingBuffer.requirements.size, 0, (void**) & stagingPtr));
-
     CreateControllingStructs();
     CreateComputeLayout();
     CreateComputePipeline();
@@ -58,25 +56,56 @@ void Renderer::BeginRendering()
     EXIT_ON_VK_ERROR(vkBeginCommandBuffer(vkResources.cmdBuffer, &cmdBuffInfo));
 
     vkCmdBeginRenderPass(vkResources.cmdBuffer, &renderPassInfos[imageIndex], VK_SUBPASS_CONTENTS_INLINE);
+
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = vkResources.swapchainInfo.capabilities.currentExtent.width;
+    viewport.height = vkResources.swapchainInfo.capabilities.currentExtent.height;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(vkResources.cmdBuffer, 0, 1, &viewport);
+
+    VkRect2D scissor{};
+    scissor.offset = { 0, 0 };
+    scissor.extent = vkResources.swapchainInfo.capabilities.currentExtent;
+    vkCmdSetScissor(vkResources.cmdBuffer, 0, 1, &scissor);
 }
 
-void Renderer::UpdateCamera(const Camera* ptr)
+uint64_t Renderer::AllocateUboPool(VkDeviceSize globalUboSize, VkDeviceSize localUboSize, VkDeviceSize poolSize)
 {
+    if(globalUboSize == 0 && localUboSize == 0)
+    {
+        return VULKAN_RENDERER_ERROR;
+    }
+
+
+    if (poolSize == 0)
+    {
+        poolSize = uboPoolSize;
+    }
+    uboPools.push_back({});
+    allocateMemoryPool(vkResources.device, vkResources.physicalDevice, poolSize, {poolSize, globalUboSize, localUboSize},
+        {VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT},
+        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+        & uboPools[uboPools.size() - 1]);
+
+    createBufferInPool(0, vkResources.device, &uboPools[uboPools.size() - 1]);
+    
+    return uboPools.size();
 }
 
-uint64_t Renderer::CreateRenderItem(uint64_t size)
+void Renderer::Render(uint64_t meshCollectionId, uint64_t pipelineId, std::vector<uint64_t> renderItems)
 {
-    return 0;
-}
-
-
-void Renderer::Render(uint64_t meshCollectionIdx, uint64_t pipelineIdx, std::vector<uint64_t> renderItems)
-{
-    vkCmdBindPipeline(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines[pipelineIdx].pipeline);
+    uint64_t meshCollectionIdx = meshCollectionId - 1;
+    vkCmdBindPipeline(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines[pipelineId].pipeline);
     VkDeviceSize offsets[] = { 0 };
     vkCmdBindVertexBuffers(vkResources.cmdBuffer, 0, 1, &meshCollections[meshCollectionIdx].vertexBuffer.buffer, offsets);
     vkCmdBindIndexBuffer(vkResources.cmdBuffer, meshCollections[meshCollectionIdx].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT16);
 
+
+    vkCmdDrawIndexed(vkResources.cmdBuffer, meshCollections[meshCollectionIdx].indexCount[0],
+        1, meshCollections[meshCollectionIdx].ibOffset[0], meshCollections[meshCollectionIdx].vbOffset[0], 1);
 }
 
 
@@ -124,13 +153,17 @@ void Renderer::Present()
 
 uint64_t Renderer::CreateMeshCollection(const std::vector<GeometryEntry>& geometryEntries)
 {
+    if (meshCollections.size() == 0xFFFE)
+    {
+        return VULKAN_RENDERER_ERROR;
+    }
+
     MeshCollection newColletion = {};
     vector<CpuBuffer> vertexBuffers(geometryEntries.size());
     vector<CpuBuffer> indexBuffers(geometryEntries.size());
     newColletion.vbOffset.resize(geometryEntries.size());
     newColletion.ibOffset.resize(geometryEntries.size());
     newColletion.indexCount.resize(geometryEntries.size());
-    size_t idx = meshCollections.size();
 
     VkDeviceSize vbSize = 0;
     VkDeviceSize ibSize = 0;
@@ -152,8 +185,8 @@ uint64_t Renderer::CreateMeshCollection(const std::vector<GeometryEntry>& geomet
                                 GET_BASE_SHAPE(geometryEntries[i].gType)->vertecies->size() * sizeof(CommonVertex) };
             indexBuffers[i] = { (const char*)GET_BASE_SHAPE(geometryEntries[i].gType)->indicies->data(),
                                GET_BASE_SHAPE(geometryEntries[i].gType)->indicies->size() * sizeof(uint16_t) };
+            newColletion.indexCount[i] = GET_BASE_SHAPE(geometryEntries[i].gType)->indicies->size();
         }
-        newColletion.indexCount[i] = ibSize - newColletion.ibOffset[i];
     }
 
     if(allocateBuffer(vkResources.device, vkResources.physicalDevice, vbSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
@@ -175,7 +208,7 @@ uint64_t Renderer::CreateMeshCollection(const std::vector<GeometryEntry>& geomet
         stagingBuffer.requirements.size, newColletion.indexBuffer.buffer, indexBuffers));
 
     meshCollections.push_back(newColletion);
-    return idx;
+    return meshCollections.size();
 
 cleanup:
     if (newColletion.vertexBuffer.buffer)
@@ -194,7 +227,7 @@ cleanup:
     {
         vkFreeMemory(vkResources.device, newColletion.indexBuffer.deviceMemory, nullptr);
     }
-    return 0xFFFFFFFFFFFFFFFF;
+    return VULKAN_RENDERER_ERROR;
 }
 
 void Renderer::CreateControllingStructs()
@@ -515,7 +548,7 @@ void Renderer::CreateBasicGraphicsPipelines()
     rasterInfo.rasterizerDiscardEnable = VK_FALSE;
     rasterInfo.polygonMode = VK_POLYGON_MODE_FILL;
     rasterInfo.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    rasterInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterInfo.depthBiasEnable = VK_FALSE;
     rasterInfo.depthBiasConstantFactor = 0.0f;
     rasterInfo.depthBiasClamp = 0.0f; 

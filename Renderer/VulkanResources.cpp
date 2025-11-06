@@ -2,7 +2,8 @@
 #include "VulkanResourcesInternal.hpp"
 #include "errors.hpp"
 #pragma comment(lib,"C:\\VulkanSDK\\1.4.304.1\\Lib\\vulkan-1.lib")
-#define RETURN_ON_ERROR(expr){VkResult result = expr; if(result != VK_SUCCESS){return result;}}
+#define RETURN_ON_VK_ERROR(expr){VkResult __result__ = (expr); if(__result__ != VK_SUCCESS){return __result__;}}
+#define JUMP_TO_ON_VK_ERROR(expr, label){VkResult __result__ = (expr); if(__result__ != VK_SUCCESS){goto label;}}
 using namespace std;
 const static char* instExt[] = {
 					 VK_KHR_SURFACE_EXTENSION_NAME,
@@ -161,7 +162,7 @@ VkResult allocateBuffer(
 	buffInfo.size = buffSize;
 	buffInfo.usage = usage;
 	buffInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	RETURN_ON_ERROR(vkCreateBuffer(device, &buffInfo, nullptr, &allocatedBuffer->buffer));
+	RETURN_ON_VK_ERROR(vkCreateBuffer(device, &buffInfo, nullptr, &allocatedBuffer->buffer));
 
 	vkGetBufferMemoryRequirements(device, allocatedBuffer->buffer, &allocatedBuffer->requirements);
 
@@ -181,8 +182,8 @@ VkResult allocateBuffer(
 	allocInfo.allocationSize = allocatedBuffer->requirements.size;
 	allocInfo.memoryTypeIndex = i;
 
-	RETURN_ON_ERROR(vkAllocateMemory(device, &allocInfo, nullptr, &allocatedBuffer->deviceMemory));
-	RETURN_ON_ERROR(vkBindBufferMemory(device, allocatedBuffer->buffer, allocatedBuffer->deviceMemory, 0));
+	RETURN_ON_VK_ERROR(vkAllocateMemory(device, &allocInfo, nullptr, &allocatedBuffer->deviceMemory));
+	RETURN_ON_VK_ERROR(vkBindBufferMemory(device, allocatedBuffer->buffer, allocatedBuffer->deviceMemory, 0));
 
 	return VK_SUCCESS;
 }
@@ -208,7 +209,7 @@ VkResult uploadStagingData(
 		{
 			if (currentBufferSize == stagingSize)
 			{
-				RETURN_ON_ERROR(performBufferCopy(cmdBuffer, executionQueue, stagingBuffer, destinationBuffer, currentBufferSize, 0, uploadedData));
+				RETURN_ON_VK_ERROR(performBufferCopy(cmdBuffer, executionQueue, stagingBuffer, destinationBuffer, currentBufferSize, 0, uploadedData));
 				uploadedData += currentBufferSize;
 				currentBufferSize = 0;
 			}
@@ -224,7 +225,7 @@ VkResult uploadStagingData(
 
 	if (currentBufferSize > 0)
 	{
-		RETURN_ON_ERROR(performBufferCopy(cmdBuffer, executionQueue, stagingBuffer, destinationBuffer, currentBufferSize, 0, uploadedData));
+		RETURN_ON_VK_ERROR(performBufferCopy(cmdBuffer, executionQueue, stagingBuffer, destinationBuffer, currentBufferSize, 0, uploadedData));
 		uploadedData += currentBufferSize;
 		currentBufferSize = 0;
 	}
@@ -249,19 +250,215 @@ VkResult performBufferCopy(
 	VkCommandBufferBeginInfo cmdBuffInfo = {};
 	cmdBuffInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	cmdBuffInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-	RETURN_ON_ERROR(vkResetCommandBuffer(cmdBuffer, 0));
-	RETURN_ON_ERROR(vkBeginCommandBuffer(cmdBuffer, &cmdBuffInfo));
+	RETURN_ON_VK_ERROR(vkResetCommandBuffer(cmdBuffer, 0));
+	RETURN_ON_VK_ERROR(vkBeginCommandBuffer(cmdBuffer, &cmdBuffInfo));
 
 	vkCmdCopyBuffer(cmdBuffer, srcBuffer, dstBuffer, 1, &copy);
 
-	RETURN_ON_ERROR(vkEndCommandBuffer(cmdBuffer));
+	RETURN_ON_VK_ERROR(vkEndCommandBuffer(cmdBuffer));
 	VkSubmitInfo submitInfo = {};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &cmdBuffer;
-	RETURN_ON_ERROR(vkQueueSubmit(executionQueue, 1, &submitInfo, nullptr));
-	RETURN_ON_ERROR(vkQueueWaitIdle(executionQueue));
+	RETURN_ON_VK_ERROR(vkQueueSubmit(executionQueue, 1, &submitInfo, nullptr));
+	RETURN_ON_VK_ERROR(vkQueueWaitIdle(executionQueue));
 
+}
+
+VkResult allocateMemoryPool(
+	VkDevice device, 
+	VkPhysicalDevice physicalDevice,
+	VkDeviceSize poolSize, 
+	const std::vector<VkDeviceSize>& bufferSizes, 
+	const std::vector<VkBufferUsageFlags>& usageFlags,
+	VkMemoryPropertyFlags memProps,
+	MemoryPool* pool)
+{
+	VkMemoryAllocateInfo allocInfo = {};
+	uint32_t heapIdx = 0;
+	bool heapSucces = false;
+
+	pool->currOffset = 0;
+	pool->maxAlignment = 0;
+	pool->poolSize = poolSize;
+	pool->resourceReqs.resize(bufferSizes.size());
+	pool->bufferInfos.resize(bufferSizes.size());
+
+	VkResult result = VK_SUCCESS;
+	VkPhysicalDeviceMemoryProperties properties;
+
+	for (size_t i = 0; i < bufferSizes.size(); i++)
+	{
+		pool->bufferInfos[i] = {};
+		pool->bufferInfos[i].sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		pool->bufferInfos[i].size = bufferSizes[i];
+		pool->bufferInfos[i].usage = usageFlags[i];
+		pool->bufferInfos[i].sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+		result = getBufferMemoryRequirements(device, bufferSizes[i], usageFlags[i], &pool->resourceReqs[i]);
+		pool->maxAlignment = max(pool->resourceReqs[i].alignment, pool->maxAlignment);
+		if (result != VK_SUCCESS)
+		{
+			goto clean;
+		};
+		if (pool->resourceReqs[i].size > poolSize)
+		{
+			result = VK_ERROR_OUT_OF_POOL_MEMORY;
+			goto clean;
+		}
+
+	}
+
+	if (bufferSizes.size() == 0)
+	{
+		pool->resourceReqs.resize(1);
+		pool->bufferInfos.resize(1);
+
+		pool->bufferInfos[0] = {};
+		pool->bufferInfos[0].sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		pool->bufferInfos[0].size = poolSize;
+		pool->bufferInfos[0].usage = usageFlags[0];
+		pool->bufferInfos[0].sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+		result = getBufferMemoryRequirements(device, poolSize, usageFlags[0], &pool->resourceReqs[0]);
+		pool->maxAlignment = max(pool->resourceReqs[0].alignment, pool->maxAlignment);
+		if (result != VK_SUCCESS)
+		{
+			goto clean;
+		};
+		if (pool->resourceReqs[0].size >= poolSize)
+		{
+			result = VK_ERROR_OUT_OF_POOL_MEMORY;
+			goto clean;
+		}
+	}
+
+	vkGetPhysicalDeviceMemoryProperties(physicalDevice, &properties);
+	for (heapIdx = 0; heapIdx < properties.memoryTypeCount; heapIdx++)
+	{
+		
+		if ((properties.memoryTypes[heapIdx].propertyFlags & memProps) == memProps)
+		{
+			size_t buffIdx = 0;
+			while (buffIdx < pool->resourceReqs.size() &&
+				   pool->resourceReqs[buffIdx].memoryTypeBits & (1 << heapIdx))
+			{
+				buffIdx++;
+			}
+			if (buffIdx == pool->resourceReqs.size())
+			{
+				heapSucces = true;
+				break;
+			}
+		}
+	}
+
+	if (!heapSucces)
+	{
+		result = VK_ERROR_UNKNOWN;
+		goto clean;
+	}
+
+	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	allocInfo.allocationSize = poolSize;
+	allocInfo.memoryTypeIndex = heapIdx;
+	result = vkAllocateMemory(device, &allocInfo, nullptr, &pool->deviceMemory);
+	if (result != VK_SUCCESS)
+	{
+		goto clean;
+	};
+
+	return VK_SUCCESS;
+
+clean:
+
+	if (pool->deviceMemory)
+	{
+		vkFreeMemory(device, pool->deviceMemory, nullptr);
+	}
+	return result;
+}
+
+VkResult createBufferInPool(
+	size_t resourceIdx,
+	VkDevice device,
+	MemoryPool* pool)
+{
+	VkDeviceSize memoryAlignOffset = pool->currOffset % pool->resourceReqs[resourceIdx].alignment;
+	if (memoryAlignOffset != 0)
+	{
+		if (pool->currOffset + memoryAlignOffset >= pool->poolSize)
+		{
+			return VK_ERROR_OUT_OF_POOL_MEMORY;
+		}
+		pool->currOffset += memoryAlignOffset;
+	}
+
+	if (pool->poolSize - pool->currOffset < pool->resourceReqs[resourceIdx].size)
+	{
+		pool->currOffset -= memoryAlignOffset;
+		return VK_ERROR_TOO_MANY_OBJECTS;
+	}
+	VkBuffer buffer = nullptr;
+	VkResult result;
+	JUMP_TO_ON_VK_ERROR(result = vkCreateBuffer(device, &pool->bufferInfos[resourceIdx], nullptr, &buffer), clean);
+	JUMP_TO_ON_VK_ERROR(result = vkBindBufferMemory(device, buffer, pool->deviceMemory, pool->currOffset), clean);
+	/*
+		TO BE CHECKED LATER
+		possible bug
+		spec states that requirements has number of bytes required to allocate for the resource,
+		yet it does not mention wheter this many bytes should be bound to resource. If there is object 1 with size 123 
+		and alignment 256 and second object with size 100 and alignment 128 there MIGHT be possibility
+		of resources boundary crossing.
+	*/ 
+	pool->currOffset += pool->resourceReqs[resourceIdx].size;
+	pool->boundBuffers.push_back(buffer);
+	return VK_SUCCESS;
+clean:
+	if (buffer)
+	{
+		vkDestroyBuffer(device, buffer, nullptr);
+	}
+	return result;
+}
+
+VkResult getBufferMemoryRequirements(
+	VkDevice device,
+	VkDeviceSize size,
+	VkBufferUsageFlags usageFlags,
+	VkMemoryRequirements* reqs,
+	VkBuffer* buffer)
+{
+	VkBuffer tmpBuff;
+	VkBuffer* ptrBuff;
+	if (!buffer)
+	{
+		ptrBuff = &tmpBuff;
+	}
+	else
+	{
+		ptrBuff = buffer;
+	}
+
+	VkBufferCreateInfo buffInfo = {};
+	buffInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	buffInfo.size = size;
+	buffInfo.usage = usageFlags;
+	buffInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	VkResult result = vkCreateBuffer(device, &buffInfo, nullptr, ptrBuff);
+	if (result != VK_SUCCESS)
+	{
+		return result;
+	};
+
+	vkGetBufferMemoryRequirements(device, *ptrBuff, reqs);
+
+	if (!buffer)
+	{
+		vkDestroyBuffer(device, *ptrBuff, nullptr);
+	}
+
+	return VK_SUCCESS;
 }
 
 

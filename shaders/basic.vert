@@ -24,8 +24,11 @@ layout(location = 2) out vec4 worldPos;
 
 void main() 
 {
-    worldPos =  objectTransform.model * vec4(inPosition, 1.0);
-    gl_Position =  cameraTransform.proj * cameraTransform.view * worldPos;
-    faceNormal =  transpose(inverse(mat3(objectTransform.model))) * inNormal;
+    //worldPos =  objectTransform.model * vec4(inPosition, 1.0);
+    //gl_Position =  cameraTransform.proj * cameraTransform.view * worldPos;
+    //faceNormal =  transpose(inverse(mat3(objectTransform.model))) * inNormal;
     texCoord = inTex;
+    worldPos = vec4(inPosition, 1.0);
+    gl_Position = vec4(inPosition, 1.0) + vec4(0, 0, 1.0, 0);
+    faceNormal = inNormal;
 }

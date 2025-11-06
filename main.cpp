@@ -9,11 +9,11 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
     vector<GeometryEntry> boxGeo({ GeometryType::Box});
     uint64_t testCollection = renderer.CreateMeshCollection(boxGeo);
-
+    uint64_t uboPool = renderer.AllocateUboPool(sizeof(Camera), sizeof(ObjectTransform), 1000000);
     while (wnd.ProcessMessages() == 0)
     {
         renderer.BeginRendering();
-        renderer.Render(testCollection, 1, {});
+        renderer.Render(testCollection, (uint64_t)PipelineTypes::Graphics, {});
         renderer.Present();
     }
 

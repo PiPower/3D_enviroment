@@ -12,6 +12,11 @@ struct VulkanPipelineData
 	std::vector<VkDescriptorSet> sets;
 };
 
+struct RenderItem
+{
+	uint64_t meshIdx;
+};
+
 struct MeshCollection
 {
 	AllocatedBuffer vertexBuffer;
@@ -19,8 +24,8 @@ struct MeshCollection
 	std::vector<uint32_t> vbOffset;
 	std::vector<uint32_t> ibOffset;
 	std::vector<uint32_t> indexCount;
+	std::vector<RenderItem> items;
 };
-
 
 enum class GeometryType
 {
@@ -52,6 +57,11 @@ struct Camera
 {
 	DirectX::XMMATRIX view;
 	DirectX::XMMATRIX proj;
+};
+
+struct ObjectTransform
+{
+	DirectX::XMMATRIX transform;
 };
 
 struct UboPool
