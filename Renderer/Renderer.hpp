@@ -3,6 +3,8 @@
 #include "ShaderCompiler.hpp"
 #include "GraphicsTypes.hpp"
 #define VULKAN_RENDERER_ERROR 0xFFFFFFFFFFFFFFFF;
+#define UBO_CAMERA_RESOURCE_TYPE 1
+#define UBO_OBJ_TRSF_RESOURCE_TYPE 2
 
 enum class PipelineTypes
 {
@@ -24,16 +26,37 @@ public:
 	/*
 		maximum number of render items per mesh collection is 0xFFFFFFFFFFFF
 	*/
-	uint64_t AllocateUboPool(VkDeviceSize globalUboSize, VkDeviceSize localUboSize, VkDeviceSize poolSize = 0);
-	uint64_t CreateRenderItem(uint64_t meshCollectionId, uint64_t meshId, uint64_t uboSize = 0);
-	void Render(uint64_t meshCollectionId, uint64_t pipelineId, std::vector<uint64_t> renderItems);
+	int64_t CreateUboPool(
+		VkDeviceSize globalUboSize,
+		VkDeviceSize localUboSize, 
+		VkDeviceSize poolSize,
+		uint64_t* createdPoolId);
+
+	int64_t AllocateUboResource(
+		uint64_t poolId, 
+		uint64_t resourceId,
+		uint64_t* allocatedUboId);
+
+	uint64_t CreateRenderItem(
+		uint64_t meshCollectionId,
+		uint64_t meshId,
+		uint64_t uboSize = 0);
+
+	void Render(
+		uint64_t meshCollectionId,
+		uint64_t pipelineId,
+		std::vector<uint64_t> renderItems);
+
 	void Present();
 	/*
 		Creates group of meshes that will be bound together to the pipeline
 		Each mesh retains index from geometryEntries
 		On error returns 0xFFFFFFFFFFFFFFFF
 	*/
-	uint64_t CreateMeshCollection(const std::vector<GeometryEntry>& geometryEntries);
+	int64_t  CreateMeshCollection(
+		const std::vector<GeometryEntry>& geometryEntries,
+		uint64_t* createdMeshId);
+
 private:
 	void CreateControllingStructs();
 	void CreateComputePipeline();
@@ -57,5 +80,5 @@ public:
 	std::vector<VkImageMemoryBarrier> restoreBarriers;
 	std::vector<MeshCollection> meshCollections;
 	std::vector<VulkanPipelineData> pipelines;
-	std::vector<MemoryPool> uboPools;
+	std::vector<UboPoolEntry> uboPoolEntries;
 };

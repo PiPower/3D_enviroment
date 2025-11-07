@@ -72,30 +72,73 @@ void Renderer::BeginRendering()
     vkCmdSetScissor(vkResources.cmdBuffer, 0, 1, &scissor);
 }
 
-uint64_t Renderer::AllocateUboPool(VkDeviceSize globalUboSize, VkDeviceSize localUboSize, VkDeviceSize poolSize)
+int64_t Renderer::CreateUboPool(
+    VkDeviceSize globalUboSize,
+    VkDeviceSize localUboSize,
+    VkDeviceSize poolSize, 
+    uint64_t* createdPoolId)
 {
+    uboPoolEntries.push_back({});
+    UboPoolEntry* newPoolEntry = &uboPoolEntries.back();
     if(globalUboSize == 0 && localUboSize == 0)
     {
         return VULKAN_RENDERER_ERROR;
     }
 
-
     if (poolSize == 0)
     {
         poolSize = uboPoolSize;
     }
-    uboPools.push_back({});
-    allocateMemoryPool(vkResources.device, vkResources.physicalDevice, poolSize, {poolSize, globalUboSize, localUboSize},
+
+    newPoolEntry->uboPool = {};
+    EXIT_ON_VK_ERROR(allocateMemoryPool(vkResources.device, vkResources.physicalDevice, poolSize, {poolSize, globalUboSize, localUboSize},
         {VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT},
         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
-        & uboPools[uboPools.size() - 1]);
+        &newPoolEntry->uboPool));
 
-    createBufferInPool(0, vkResources.device, &uboPools[uboPools.size() - 1]);
+    EXIT_ON_VK_ERROR(createBufferInPool(0, vkResources.device, &newPoolEntry->uboPool));
+    EXIT_ON_VK_ERROR(vkMapMemory(vkResources.device, newPoolEntry->uboPool.deviceMemory, 0, newPoolEntry->uboPool.bufferInfos[0].size, 0, (void**) &newPoolEntry->memoryMap));
     
-    return uboPools.size();
+    *createdPoolId = uboPoolEntries.size();
+    return 0;
 }
 
-void Renderer::Render(uint64_t meshCollectionId, uint64_t pipelineId, std::vector<uint64_t> renderItems)
+int64_t Renderer::AllocateUboResource(
+    uint64_t poolId, 
+    uint64_t resourceId,
+    uint64_t* allocatedUboId)
+{
+    if (poolId > uboPoolEntries.size())
+    {
+        return -1;
+    }
+
+    UboPoolEntry* uboPoolEntry = &uboPoolEntries[poolId - 1];
+    if (resourceId == 0 || resourceId > uboPoolEntry->uboPool.resourceReqs.size())
+    {
+        return -1;
+    }
+
+    UboEntry uboDesc = {};
+    uboDesc.resourceId = resourceId;
+    SET_UBO_ENTRY_ALIVE(&uboDesc);
+    const VkMemoryRequirements& resourceReqs = uboPoolEntry->uboPool.resourceReqs[resourceId];
+    const VkBufferCreateInfo resourceInfo = uboPoolEntry->uboPool.bufferInfos[resourceId];
+    VkDeviceSize memoryUpdateSize;
+    EXIT_ON_VK_ERROR(findOffsetInBuffer(uboPoolEntry->poolOffset, resourceReqs.alignment, resourceReqs.size,
+                    uboPoolEntry->uboPool.poolSize, resourceInfo.size, &uboDesc.bufferOffset, &memoryUpdateSize) );
+
+    uboPoolEntry->uboEntries.push_back(uboDesc);
+    uboPoolEntry->poolOffset += memoryUpdateSize;
+    *allocatedUboId = uboPoolEntry->uboEntries.size();
+
+    return 0;
+}
+
+void Renderer::Render(
+    uint64_t meshCollectionId,
+    uint64_t pipelineId,
+    std::vector<uint64_t> renderItems)
 {
     uint64_t meshCollectionIdx = meshCollectionId - 1;
     vkCmdBindPipeline(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines[pipelineId].pipeline);
@@ -151,7 +194,9 @@ void Renderer::Present()
 
 }
 
-uint64_t Renderer::CreateMeshCollection(const std::vector<GeometryEntry>& geometryEntries)
+int64_t Renderer::CreateMeshCollection(
+    const std::vector<GeometryEntry>& geometryEntries,
+    uint64_t* createdMeshId)
 {
     if (meshCollections.size() == 0xFFFE)
     {
@@ -208,7 +253,8 @@ uint64_t Renderer::CreateMeshCollection(const std::vector<GeometryEntry>& geomet
         stagingBuffer.requirements.size, newColletion.indexBuffer.buffer, indexBuffers));
 
     meshCollections.push_back(newColletion);
-    return meshCollections.size();
+    *createdMeshId = meshCollections.size();
+    return 0;
 
 cleanup:
     if (newColletion.vertexBuffer.buffer)

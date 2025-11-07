@@ -122,6 +122,15 @@ VkResult allocateMemoryPool(
 	VkMemoryPropertyFlags usageFlags,
 	MemoryPool* pool);
 
+VkResult findOffsetInBuffer(
+	VkDeviceSize currOffsetInBuffer,
+	VkDeviceSize requiredAlignment,
+	VkDeviceSize allocationSize,
+	VkDeviceSize bufferSize,
+	VkDeviceSize resourceSize,
+	VkDeviceSize* resourceOffset,
+	VkDeviceSize* memoryUpdateSize);
+
 VkResult createBufferInPool(
 	size_t resourceIdx,
 	VkDevice device,

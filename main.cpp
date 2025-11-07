@@ -8,8 +8,12 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
     Renderer renderer(hInstance, wnd.GetWindowHWND());
 
     vector<GeometryEntry> boxGeo({ GeometryType::Box});
-    uint64_t testCollection = renderer.CreateMeshCollection(boxGeo);
-    uint64_t uboPool = renderer.AllocateUboPool(sizeof(Camera), sizeof(ObjectTransform), 1000000);
+    uint64_t testCollection, uboPool, cameraUbo, rectUbo;
+    renderer.CreateMeshCollection(boxGeo, &testCollection);
+    renderer.CreateUboPool(sizeof(Camera), sizeof(ObjectTransform), 1000000, &uboPool);
+    renderer.AllocateUboResource(uboPool, UBO_CAMERA_RESOURCE_TYPE, &cameraUbo);
+    renderer.AllocateUboResource(uboPool, UBO_OBJ_TRSF_RESOURCE_TYPE, &rectUbo);
+
     while (wnd.ProcessMessages() == 0)
     {
         renderer.BeginRendering();

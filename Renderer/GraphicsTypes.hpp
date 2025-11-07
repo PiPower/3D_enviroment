@@ -64,8 +64,25 @@ struct ObjectTransform
 	DirectX::XMMATRIX transform;
 };
 
-struct UboPool
+struct UboEntry
 {
-	AllocatedBuffer baseBuffer;
-	std::vector<VkBuffer> uboBuffers;
+	VkDeviceSize bufferOffset;
+	uint64_t resourceId;
+	// bit 0: is alive
+	int32_t traits;
 };
+
+/*
+	Continous sequence of ubo buffers in memory
+*/
+struct UboPoolEntry
+{
+	std::vector<UboEntry> uboEntries;
+	MemoryPool uboPool;
+	VkDeviceSize poolOffset;
+	char* memoryMap;
+};
+
+inline char IS_UBO_ENTRY_ALIVE(const UboEntry* ubo) { return ubo->traits & 0x01; }
+inline void SET_UBO_ENTRY_ALIVE(UboEntry* ubo) { ubo->traits = ubo->traits | 0x01; }
+inline void SET_UBO_ENTRY_DEAD(UboEntry* ubo) { ubo->traits = ubo->traits & ~0x01; }

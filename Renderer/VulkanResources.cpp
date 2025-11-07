@@ -379,30 +379,52 @@ clean:
 	return result;
 }
 
+VkResult findOffsetInBuffer(
+	VkDeviceSize currOffsetInBuffer,
+	VkDeviceSize requiredAlignment,
+	VkDeviceSize allocationSize,
+	VkDeviceSize bufferSize,
+	VkDeviceSize resourceSize,
+	VkDeviceSize* resourceOffset,
+	VkDeviceSize* memoryUpdateSize)
+{
+	VkDeviceSize currOffset = currOffsetInBuffer;
+	VkDeviceSize memoryAlignOffset = currOffset % requiredAlignment;
+	if (memoryAlignOffset != 0)
+	{
+		if (currOffset + memoryAlignOffset >= bufferSize)
+		{
+			return VK_ERROR_OUT_OF_POOL_MEMORY;
+		}
+		currOffset += memoryAlignOffset;
+	}
+
+	if (bufferSize - currOffset < resourceSize)
+	{
+		return VK_ERROR_TOO_MANY_OBJECTS;
+	}
+
+	*resourceOffset = currOffset;
+	*memoryUpdateSize = allocationSize + memoryAlignOffset;
+
+	return VK_SUCCESS;
+}
+
 VkResult createBufferInPool(
 	size_t resourceIdx,
 	VkDevice device,
 	MemoryPool* pool)
 {
-	VkDeviceSize memoryAlignOffset = pool->currOffset % pool->resourceReqs[resourceIdx].alignment;
-	if (memoryAlignOffset != 0)
-	{
-		if (pool->currOffset + memoryAlignOffset >= pool->poolSize)
-		{
-			return VK_ERROR_OUT_OF_POOL_MEMORY;
-		}
-		pool->currOffset += memoryAlignOffset;
-	}
+	VkDeviceSize resourceOffset, memoryUpdateSize;
+	const VkMemoryRequirements& resourceReq = pool->resourceReqs[resourceIdx];
+	const VkBufferCreateInfo resourceInfo = pool->bufferInfos[resourceIdx];
+	findOffsetInBuffer(pool->currOffset, resourceReq.alignment, resourceReq.size,
+				pool->poolSize, resourceInfo.size, &resourceOffset, &memoryUpdateSize);
 
-	if (pool->poolSize - pool->currOffset < pool->resourceReqs[resourceIdx].size)
-	{
-		pool->currOffset -= memoryAlignOffset;
-		return VK_ERROR_TOO_MANY_OBJECTS;
-	}
 	VkBuffer buffer = nullptr;
 	VkResult result;
 	JUMP_TO_ON_VK_ERROR(result = vkCreateBuffer(device, &pool->bufferInfos[resourceIdx], nullptr, &buffer), clean);
-	JUMP_TO_ON_VK_ERROR(result = vkBindBufferMemory(device, buffer, pool->deviceMemory, pool->currOffset), clean);
+	JUMP_TO_ON_VK_ERROR(result = vkBindBufferMemory(device, buffer, pool->deviceMemory, resourceOffset), clean);
 	/*
 		TO BE CHECKED LATER
 		possible bug
@@ -411,7 +433,7 @@ VkResult createBufferInPool(
 		and alignment 256 and second object with size 100 and alignment 128 there MIGHT be possibility
 		of resources boundary crossing.
 	*/ 
-	pool->currOffset += pool->resourceReqs[resourceIdx].size;
+	pool->currOffset += memoryUpdateSize;
 	pool->boundBuffers.push_back(buffer);
 	return VK_SUCCESS;
 clean:
