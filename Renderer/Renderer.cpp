@@ -102,7 +102,8 @@ int64_t Renderer::UpdateUboMemory(
         return -2;
     }
     UboEntry* entry = &uboPoolEntry->uboEntries[uboId - 1];
-    memcpy(uboPoolEntry->memoryMap + entry->bufferIdx * MAX_UBO_POOL_SIZE, buff, uboPoolEntry->uboPool.bufferInfos[entry->resourceId].size);
+    char* uboMem = uboPoolEntry->memoryMap + entry->bufferIdx * MAX_UBO_POOL_SIZE + entry->bufferOffset;
+    memcpy(uboMem, buff, uboPoolEntry->uboPool.bufferInfos[entry->resourceId].size);
     return 0;
 }
 
@@ -175,11 +176,9 @@ int64_t Renderer::AllocateUboResource(
         }
         uboPoolEntry->bufferIdx++;
         uboDesc.bufferIdx = uboPoolEntry->bufferIdx;
-        uboPoolEntry->bufferOffset = 0;
         EXIT_ON_VK_ERROR(findOffsetInBuffer(uboPoolEntry->bufferOffset, resourceReqs.alignment, resourceReqs.size,
             uboPoolEntry->uboPool.poolSize, resourceInfo.size, &uboDesc.bufferOffset, &memoryUpdateSize));
     }
-
     uboPoolEntry->uboEntries.push_back(uboDesc);
     uboPoolEntry->bufferOffset += memoryUpdateSize;
 
@@ -221,11 +220,11 @@ int64_t Renderer::BindUboPoolToPipeline(
 
         buffInfos[GFX_CAMERA_UBO].buffer = uboPoolEntry->uboPool.boundBuffers[camUbo->bufferIdx];
         buffInfos[GFX_CAMERA_UBO].offset = 0;
-        buffInfos[GFX_CAMERA_UBO].range = uboPoolEntry->uboPool.bufferInfos[UBO_BUFFER_RESOURCE_TYPE].size;
+        buffInfos[GFX_CAMERA_UBO].range = uboPoolEntry->uboPool.bufferInfos[GFX_CAMERA_UBO].size;
 
         buffInfos[GFX_OBJECT_UBO].buffer = uboPoolEntry->uboPool.boundBuffers[i];
         buffInfos[GFX_OBJECT_UBO].offset = 0;
-        buffInfos[GFX_OBJECT_UBO].range = uboPoolEntry->uboPool.bufferInfos[UBO_BUFFER_RESOURCE_TYPE].size;
+        buffInfos[GFX_OBJECT_UBO].range = uboPoolEntry->uboPool.bufferInfos[GFX_OBJECT_UBO].size;
 
         updateGfxSet[GFX_CAMERA_UBO].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         updateGfxSet[GFX_CAMERA_UBO].dstSet = pipelineData->sets[i];
@@ -243,7 +242,7 @@ int64_t Renderer::BindUboPoolToPipeline(
         updateGfxSet[GFX_OBJECT_UBO].descriptorCount = 1;
         updateGfxSet[GFX_OBJECT_UBO].pBufferInfo = &buffInfos[GFX_OBJECT_UBO];
 
-        vkUpdateDescriptorSets(vkResources.device, 1, updateGfxSet, 0, nullptr);
+        vkUpdateDescriptorSets(vkResources.device, 2, updateGfxSet, 0, nullptr);
     }
     return 0;
 }

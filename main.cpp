@@ -9,6 +9,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
     Window wnd(1600, 900, L"yolo", L"test");
     Renderer renderer(hInstance, wnd.GetWindowHWND());
     Camera camera = {};
+    ObjectTransform objTransform;
+
+    XMStoreFloat4x4(&objTransform.transform, XMMatrixTranslation(0.5, 0, 0));
 
     XMVECTOR eyePos, lookAt, up;
     XMFLOAT3 eyePosFloat{0.0f, 0.0f, -2}, lookAtFloat{0.0f, 0.0f, 1.0f}, upFloat{0.0f, 1.0f, 0.0f};
@@ -21,12 +24,14 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
     camera.proj._22 *= -1.0f;// vulkan has -1.0f on top and 1.0f on bottom
 
     vector<GeometryEntry> boxGeo({ GeometryType::Box});
-    uint64_t testCollection, uboPool, cameraUbo, rectUbo;
+    uint64_t testCollection, uboPool, cameraUbo, rectUbo, rectUbo2;
     renderer.CreateMeshCollection(boxGeo, &testCollection);
     renderer.CreateUboPool(sizeof(Camera), sizeof(ObjectTransform), 150'000, &uboPool);
     renderer.AllocateUboResource(uboPool, UBO_CAMERA_RESOURCE_TYPE, &cameraUbo);
+    renderer.AllocateUboResource(uboPool, UBO_OBJ_TRSF_RESOURCE_TYPE, &rectUbo2);
     renderer.AllocateUboResource(uboPool, UBO_OBJ_TRSF_RESOURCE_TYPE, &rectUbo);
     renderer.UpdateUboMemory(uboPool, cameraUbo, (char*) &camera);
+    renderer.UpdateUboMemory(uboPool, rectUbo, (char*)&objTransform);
     renderer.BindUboPoolToPipeline((uint64_t)PipelineTypes::Graphics, uboPool, cameraUbo);
     vector<RenderItem> items{ { 0, 0, rectUbo, 0 } };
 

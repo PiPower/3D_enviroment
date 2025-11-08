@@ -12,4 +12,5 @@ void main()
 {
     outColor = vec4(0.9f, 0.3f, 0.3f, 1.0f);
     outColor.rgb = pow(outColor.rgb, vec3(1.0/GAMMA_F));
+
 }

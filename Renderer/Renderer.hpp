@@ -47,11 +47,6 @@ public:
 		uint64_t uboPoolId,
 		uint64_t cameraUboId);
 
-	uint64_t CreateRenderItem(
-		uint64_t meshCollectionId,
-		uint64_t meshId,
-		uint64_t uboSize = 0);
-
 	void Render(
 		uint64_t meshCollectionId,
 		uint64_t pipelineId,
