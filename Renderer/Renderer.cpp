@@ -3,6 +3,8 @@
 #include "errors.hpp"
 #include "CommonShapes.hpp"
 using namespace std;
+static constexpr uint32_t MAX_UBO_POOL_SIZE = 65536;
+
 #define GET_PIPELINE(type) pipelines[static_cast<uint32_t>(type)]
 #define GET_BASE_SHAPE(name) baseShapesTable[static_cast<uint32_t>(name)]
 enum class ComputeLayout
@@ -16,6 +18,16 @@ static constexpr uint32_t CL_RENDER_TEXTURE = static_cast<uint32_t>(ComputeLayou
 static constexpr uint32_t CL_COMPUTE_TEXTURE = static_cast<uint32_t>(ComputeLayout::ComputeTexture);
 static constexpr uint32_t CL_STORAGE_IMAGES = static_cast<uint32_t>(ComputeLayout::StorageImageCount);
 
+enum class GraphicsLayout
+{
+    CameraUbo = 0,
+    ObjectUbo,
+    GfxEntryCount
+};
+
+static constexpr uint32_t GFX_CAMERA_UBO = static_cast<uint32_t>(GraphicsLayout::CameraUbo);
+static constexpr uint32_t GFX_OBJECT_UBO = static_cast<uint32_t>(GraphicsLayout::ObjectUbo);
+static constexpr uint32_t GFX_ENTRY_COUNT = static_cast<uint32_t>(GraphicsLayout::GfxEntryCount);
 
 const Geometry* baseShapesTable[]
 {
@@ -27,7 +39,7 @@ Renderer::Renderer(
     HWND hwnd,
     VkDeviceSize stagingSize)
 	:
-	windowHwnd(hwnd), compiler(), pipelines(3)
+	windowHwnd(hwnd), compiler(), pipelines(3), maxUboPoolSize(65536)
 {
 	createVulkanResources(&vkResources, hinstance, windowHwnd);
 
@@ -72,6 +84,25 @@ void Renderer::BeginRendering()
     vkCmdSetScissor(vkResources.cmdBuffer, 0, 1, &scissor);
 }
 
+int64_t Renderer::UpdateUboMemory(
+    uint64_t poolId,
+    uint64_t uboId,
+    const char* buff)
+{
+    if (poolId > uboPoolEntries.size())
+    {
+        return -1;
+    }
+
+    UboPoolEntry* uboPoolEntry = &uboPoolEntries[poolId - 1];
+    if (uboId > uboPoolEntry->uboEntries.size())
+    {
+        return -2;
+    }
+    memcpy(uboPoolEntry->memoryMap, buff, uboPoolEntry->uboPool.bufferInfos[uboPoolEntry->uboEntries[uboId - 1].resourceId].size);
+    return 0;
+}
+
 int64_t Renderer::CreateUboPool(
     VkDeviceSize globalUboSize,
     VkDeviceSize localUboSize,
@@ -85,9 +116,14 @@ int64_t Renderer::CreateUboPool(
         return VULKAN_RENDERER_ERROR;
     }
 
+    if (poolSize > MAX_UBO_POOL_SIZE)
+    {
+        return  VULKAN_RENDERER_ERROR;
+    }
+
     if (poolSize == 0)
     {
-        poolSize = uboPoolSize;
+        poolSize = MAX_UBO_POOL_SIZE;
     }
 
     newPoolEntry->uboPool = {};
@@ -135,17 +171,68 @@ int64_t Renderer::AllocateUboResource(
     return 0;
 }
 
+int64_t Renderer::BindUboPoolToPipeline(
+    uint64_t pipelineId,
+    uint64_t uboPoolId)
+{
+    if (pipelineId > pipelines.size())
+    {
+        return -1;
+    }
+    if (uboPoolId > uboPoolEntries.size())
+    {
+        return -1;
+    }
+    VulkanPipelineData* pipelineData = &pipelines[pipelineId];
+    UboPoolEntry* uboPoolEntry = &uboPoolEntries[uboPoolId - 1];
+
+    VkWriteDescriptorSet updateGfxSet[GFX_ENTRY_COUNT] = {};
+    VkDescriptorBufferInfo buffInfos[GFX_ENTRY_COUNT] = {};
+     
+    buffInfos[GFX_CAMERA_UBO].buffer = uboPoolEntry->uboPool.boundBuffers[0];
+    buffInfos[GFX_CAMERA_UBO].offset = 0;
+    buffInfos[GFX_CAMERA_UBO].range = uboPoolEntry->uboPool.poolSize;
+
+    buffInfos[GFX_OBJECT_UBO].buffer = uboPoolEntry->uboPool.boundBuffers[0];
+    buffInfos[GFX_OBJECT_UBO].offset = 0;
+    buffInfos[GFX_OBJECT_UBO].range = uboPoolEntry->uboPool.poolSize;
+
+    updateGfxSet[GFX_CAMERA_UBO].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    updateGfxSet[GFX_CAMERA_UBO].dstSet = pipelineData->sets[0];
+    updateGfxSet[GFX_CAMERA_UBO].dstBinding = GFX_CAMERA_UBO;
+    updateGfxSet[GFX_CAMERA_UBO].dstArrayElement = 0;
+    updateGfxSet[GFX_CAMERA_UBO].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    updateGfxSet[GFX_CAMERA_UBO].descriptorCount = 1;
+    updateGfxSet[GFX_CAMERA_UBO].pBufferInfo = &buffInfos[GFX_CAMERA_UBO];
+
+    updateGfxSet[GFX_OBJECT_UBO].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    updateGfxSet[GFX_OBJECT_UBO].dstSet = pipelineData->sets[0];
+    updateGfxSet[GFX_OBJECT_UBO].dstBinding = GFX_OBJECT_UBO;
+    updateGfxSet[GFX_OBJECT_UBO].dstArrayElement = 0;
+    updateGfxSet[GFX_OBJECT_UBO].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    updateGfxSet[GFX_OBJECT_UBO].descriptorCount = 1;
+    updateGfxSet[GFX_OBJECT_UBO].pBufferInfo = &buffInfos[GFX_OBJECT_UBO];
+
+    vkUpdateDescriptorSets(vkResources.device, 2, updateGfxSet, 0, nullptr);
+    return 0;
+}
+
 void Renderer::Render(
+    uint64_t cameraUboPoolId,
+    uint64_t cameraUboId,
     uint64_t meshCollectionId,
     uint64_t pipelineId,
     std::vector<uint64_t> renderItems)
 {
     uint64_t meshCollectionIdx = meshCollectionId - 1;
-    vkCmdBindPipeline(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines[pipelineId].pipeline);
     VkDeviceSize offsets[] = { 0 };
+    UboPoolEntry* uboPool = &uboPoolEntries[cameraUboPoolId - 1];
+    uint32_t setDynamicRange[2] = { uboPool->uboEntries[cameraUboId - 1].bufferOffset, 0};
+    vkCmdBindPipeline(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines[pipelineId].pipeline);
     vkCmdBindVertexBuffers(vkResources.cmdBuffer, 0, 1, &meshCollections[meshCollectionIdx].vertexBuffer.buffer, offsets);
     vkCmdBindIndexBuffer(vkResources.cmdBuffer, meshCollections[meshCollectionIdx].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT16);
-
+    vkCmdBindDescriptorSets(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines[pipelineId].pipelineLayout,
+                                                                0, 1, pipelines[pipelineId].sets.data(), 2, setDynamicRange);
 
     vkCmdDrawIndexed(vkResources.cmdBuffer, meshCollections[meshCollectionIdx].indexCount[0],
         1, meshCollections[meshCollectionIdx].ibOffset[0], meshCollections[meshCollectionIdx].vbOffset[0], 1);
@@ -442,27 +529,34 @@ void Renderer::CreateDescriptorSets()
     
     GET_PIPELINE(PipelineTypes::Compute).sets.resize(vkResources.renderTextures.size());
 
-    VkDescriptorPoolSize poolSize[1] = {};
+    VkDescriptorPoolSize poolSize[2] = {};
     poolSize[0].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     poolSize[0].descriptorCount = CL_STORAGE_IMAGES * vkResources.renderTextures.size();
+    poolSize[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    poolSize[1].descriptorCount = 2 * 2;
 
     VkDescriptorPoolCreateInfo poolDesc = {};
     poolDesc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolDesc.maxSets = vkResources.renderTextures.size();
-    poolDesc.poolSizeCount = 1;
+    poolDesc.maxSets = vkResources.renderTextures.size() + 2;
+    poolDesc.poolSizeCount = 2;
     poolDesc.pPoolSizes = poolSize;
     EXIT_ON_VK_ERROR(vkCreateDescriptorPool(vkResources.device, &poolDesc, nullptr, &pipelinesPool));
 
     vector<VkDescriptorSetLayout> layouts(vkResources.renderTextures.size(), GET_PIPELINE(PipelineTypes::Compute).descriptorSetLayout);
-    vector<VkDescriptorSet> sets(vkResources.renderTextures.size());
+    layouts.push_back(GET_PIPELINE(PipelineTypes::Graphics).descriptorSetLayout);
+    layouts.push_back(GET_PIPELINE(PipelineTypes::GraphicsNonFill).descriptorSetLayout);
+
+    vector<VkDescriptorSet> sets(vkResources.renderTextures.size() + 2);
     VkDescriptorSetAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocInfo.descriptorPool = pipelinesPool;
-    allocInfo.descriptorSetCount = vkResources.renderTextures.size();
+    allocInfo.descriptorSetCount = layouts.size();
     allocInfo.pSetLayouts = layouts.data();
 
     EXIT_ON_VK_ERROR(vkAllocateDescriptorSets(vkResources.device, &allocInfo, sets.data()));
     copy(sets.begin(), sets.begin() + vkResources.renderTextures.size(), GET_PIPELINE(PipelineTypes::Compute).sets.begin());
+    GET_PIPELINE(PipelineTypes::Graphics).sets.push_back(sets[vkResources.renderTextures.size()]);
+    GET_PIPELINE(PipelineTypes::GraphicsNonFill).sets.push_back(sets[vkResources.renderTextures.size() + 1]);
 
     for (size_t i = 0; i < vkResources.renderTextures.size(); i++)
     {
@@ -500,7 +594,7 @@ void Renderer::CreateBasicGraphicsLayout()
 {
     VkDescriptorSetLayoutBinding bindings[2] = {};
     bindings[0].binding = 0;
-    bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
     bindings[0].descriptorCount = 1;
     bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     bindings[0].pImmutableSamplers = nullptr;

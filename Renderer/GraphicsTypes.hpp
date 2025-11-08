@@ -55,13 +55,13 @@ struct GeometryEntry
 
 struct Camera 
 {
-	DirectX::XMMATRIX view;
-	DirectX::XMMATRIX proj;
+	DirectX::XMFLOAT4X4 view;
+	DirectX::XMFLOAT4X4 proj;
 };
 
 struct ObjectTransform
 {
-	DirectX::XMMATRIX transform;
+	DirectX::XMFLOAT4X4 transform;
 };
 
 struct UboEntry

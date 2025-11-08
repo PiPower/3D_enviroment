@@ -29,6 +29,6 @@ void main()
     //faceNormal =  transpose(inverse(mat3(objectTransform.model))) * inNormal;
     texCoord = inTex;
     worldPos = vec4(inPosition, 1.0);
-    gl_Position = vec4(inPosition, 1.0) + vec4(0, 0, 1.0, 0);
+    gl_Position = cameraTransform.proj * cameraTransform.view * vec4(inPosition, 1.0);
     faceNormal = inNormal;
 }
