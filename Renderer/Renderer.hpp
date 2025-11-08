@@ -13,11 +13,6 @@ enum class PipelineTypes
 	GraphicsNonFill
 };
 
-struct RenderItem
-{
-
-};
-
 class Renderer
 {
 public:
@@ -58,11 +53,9 @@ public:
 		uint64_t uboSize = 0);
 
 	void Render(
-		uint64_t cameraUboPoolId,
-		uint64_t cameraUboId,
 		uint64_t meshCollectionId,
 		uint64_t pipelineId,
-		std::vector<uint64_t> renderItems);
+		const std::vector<RenderItem>& renderItems);
 
 	void Present();
 	/*
@@ -78,9 +71,11 @@ private:
 	void CreateControllingStructs();
 	void CreateComputePipeline();
 	void CreateComputeLayout();
-	void CreateDescriptorSets();
+	void CreatePipelinePools();
 	void CreateBasicGraphicsLayout();
 	void CreateBasicGraphicsPipelines();
+	void CreateGraphicsSets();
+	void UpdateComputeSets();
 public:
 	uint32_t imageIndex;
 	VkDeviceSize maxUboPoolSize;
@@ -88,7 +83,6 @@ public:
 	HWND windowHwnd;
 	VkSubmitInfo submitInfo;
 	ShaderCompiler compiler;
-	VkDescriptorPool pipelinesPool;
 	VkImageCopy computeSwapchainCopy;
 	AllocatedBuffer stagingBuffer;
 	char* stagingPtr;

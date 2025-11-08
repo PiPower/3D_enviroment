@@ -27,12 +27,12 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
     renderer.AllocateUboResource(uboPool, UBO_CAMERA_RESOURCE_TYPE, &cameraUbo);
     renderer.AllocateUboResource(uboPool, UBO_OBJ_TRSF_RESOURCE_TYPE, &rectUbo);
     renderer.UpdateUboMemory(uboPool, cameraUbo, (char*) &camera);
-    renderer.BindUboPoolToPipeline((uint64_t)PipelineTypes::Graphics, uboPool);
+    renderer.BindUboPoolToPipeline((uint64_t)PipelineTypes::Graphics, uboPool, cameraUbo);
 
     while (wnd.ProcessMessages() == 0)
     {
         renderer.BeginRendering();
-        renderer.Render(uboPool, cameraUbo,testCollection, (uint64_t)PipelineTypes::Graphics, {});
+        renderer.Render(testCollection, (uint64_t)PipelineTypes::Graphics, {});
         renderer.Present();
     }
 

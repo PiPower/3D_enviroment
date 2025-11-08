@@ -52,8 +52,9 @@ Renderer::Renderer(
     CreateComputePipeline();
     CreateBasicGraphicsLayout();
     CreateBasicGraphicsPipelines();
-    CreateDescriptorSets();
-
+    CreatePipelinePools();
+    UpdateComputeSets();
+    CreateGraphicsSets();
 }
 
 void Renderer::BeginRendering()
@@ -198,57 +199,72 @@ int64_t Renderer::BindUboPoolToPipeline(
     }
     if (uboPoolId > uboPoolEntries.size())
     {
-        return -1;
+        return -2;
     }
+
+    if (pipelines[pipelineId].maxSets < uboPoolEntries[uboPoolId - 1].uboPool.boundBuffers.size())
+    {
+        return -3;
+    }
+
     VulkanPipelineData* pipelineData = &pipelines[pipelineId];
     UboPoolEntry* uboPoolEntry = &uboPoolEntries[uboPoolId - 1];
     UboEntry* camUbo = &uboPoolEntry->uboEntries[cameraUboId - 1];
 
-    pipelineData->buffInfos[GFX_CAMERA_UBO].buffer = uboPoolEntry->uboPool.boundBuffers[camUbo->bufferIdx];
-    pipelineData->buffInfos[GFX_CAMERA_UBO].offset = 0;
-    pipelineData->buffInfos[GFX_CAMERA_UBO].range = uboPoolEntry->uboPool.bufferInfos[UBO_BUFFER_RESOURCE_TYPE].size;
+    VkWriteDescriptorSet updateGfxSet[2];
+    VkDescriptorBufferInfo buffInfos[2];
 
-    pipelineData->buffInfos[GFX_OBJECT_UBO].buffer = uboPoolEntry->uboPool.boundBuffers[0];
-    pipelineData->buffInfos[GFX_OBJECT_UBO].offset = 0;
-    pipelineData->buffInfos[GFX_OBJECT_UBO].range = uboPoolEntry->uboPool.bufferInfos[UBO_BUFFER_RESOURCE_TYPE].size;
+    pipelineData->boundPoolId = uboPoolId;
+    pipelineData->boundCameraUboId = cameraUboId;
 
-    pipelineData->updateGfxSet[GFX_CAMERA_UBO].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    pipelineData->updateGfxSet[GFX_CAMERA_UBO].dstSet = pipelineData->sets[0];
-    pipelineData->updateGfxSet[GFX_CAMERA_UBO].dstBinding = GFX_CAMERA_UBO;
-    pipelineData->updateGfxSet[GFX_CAMERA_UBO].dstArrayElement = 0;
-    pipelineData->updateGfxSet[GFX_CAMERA_UBO].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-    pipelineData->updateGfxSet[GFX_CAMERA_UBO].descriptorCount = 1;
-    pipelineData->updateGfxSet[GFX_CAMERA_UBO].pBufferInfo = &pipelineData->buffInfos[GFX_CAMERA_UBO];
+    buffInfos[GFX_CAMERA_UBO].buffer = uboPoolEntry->uboPool.boundBuffers[camUbo->bufferIdx];
+    buffInfos[GFX_CAMERA_UBO].offset = 0;
+    buffInfos[GFX_CAMERA_UBO].range = uboPoolEntry->uboPool.bufferInfos[UBO_BUFFER_RESOURCE_TYPE].size;
 
-    pipelineData->updateGfxSet[GFX_OBJECT_UBO].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    pipelineData->updateGfxSet[GFX_OBJECT_UBO].dstSet = pipelineData->sets[0];
-    pipelineData->updateGfxSet[GFX_OBJECT_UBO].dstBinding = GFX_OBJECT_UBO;
-    pipelineData->updateGfxSet[GFX_OBJECT_UBO].dstArrayElement = 0;
-    pipelineData->updateGfxSet[GFX_OBJECT_UBO].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-    pipelineData->updateGfxSet[GFX_OBJECT_UBO].descriptorCount = 1;
-    pipelineData->updateGfxSet[GFX_OBJECT_UBO].pBufferInfo = &pipelineData->buffInfos[GFX_OBJECT_UBO];
+    buffInfos[GFX_OBJECT_UBO].buffer = uboPoolEntry->uboPool.boundBuffers[0];
+    buffInfos[GFX_OBJECT_UBO].offset = 0;
+    buffInfos[GFX_OBJECT_UBO].range = uboPoolEntry->uboPool.bufferInfos[UBO_BUFFER_RESOURCE_TYPE].size;
 
-    vkUpdateDescriptorSets(vkResources.device, 2, pipelineData->updateGfxSet, 0, nullptr);
+    updateGfxSet[GFX_CAMERA_UBO].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    updateGfxSet[GFX_CAMERA_UBO].dstSet = pipelineData->sets[0];
+    updateGfxSet[GFX_CAMERA_UBO].dstBinding = GFX_CAMERA_UBO;
+    updateGfxSet[GFX_CAMERA_UBO].dstArrayElement = 0;
+    updateGfxSet[GFX_CAMERA_UBO].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    updateGfxSet[GFX_CAMERA_UBO].descriptorCount = 1;
+    updateGfxSet[GFX_CAMERA_UBO].pBufferInfo = &buffInfos[GFX_CAMERA_UBO];
+
+    updateGfxSet[GFX_OBJECT_UBO].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    updateGfxSet[GFX_OBJECT_UBO].dstSet = pipelineData->sets[0];
+    updateGfxSet[GFX_OBJECT_UBO].dstBinding = GFX_OBJECT_UBO;
+    updateGfxSet[GFX_OBJECT_UBO].dstArrayElement = 0;
+    updateGfxSet[GFX_OBJECT_UBO].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    updateGfxSet[GFX_OBJECT_UBO].descriptorCount = 1;
+    updateGfxSet[GFX_OBJECT_UBO].pBufferInfo = &buffInfos[GFX_OBJECT_UBO];
+
+    vkUpdateDescriptorSets(vkResources.device, 2, updateGfxSet, 0, nullptr);
     return 0;
 }
 
 void Renderer::Render(
-    uint64_t cameraUboPoolId,
-    uint64_t cameraUboId,
     uint64_t meshCollectionId,
     uint64_t pipelineId,
-    std::vector<uint64_t> renderItems)
+    const std::vector<RenderItem>& renderItems)
 {
     uint64_t meshCollectionIdx = meshCollectionId - 1;
     VkDeviceSize offsets[] = { 0 };
-    UboPoolEntry* uboPool = &uboPoolEntries[cameraUboPoolId - 1];
-    uint32_t setDynamicRange[2] = { uboPool->uboEntries[cameraUboId - 1].bufferOffset, 0};
+    UboPoolEntry* uboPool = &uboPoolEntries[pipelines[pipelineId].boundPoolId - 1];
 
     vkCmdBindPipeline(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines[pipelineId].pipeline);
     vkCmdBindVertexBuffers(vkResources.cmdBuffer, 0, 1, &meshCollections[meshCollectionIdx].vertexBuffer.buffer, offsets);
     vkCmdBindIndexBuffer(vkResources.cmdBuffer, meshCollections[meshCollectionIdx].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT16);
-    vkCmdBindDescriptorSets(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines[pipelineId].pipelineLayout,
-                                                                0, 1, pipelines[pipelineId].sets.data(), 2, setDynamicRange);
+
+    for (size_t i = 0; i < renderItems.size(); i++)
+    {
+        uint32_t setDynamicRange[2] = { uboPool->uboEntries[pipelines[pipelineId].boundCameraUboId - 1].bufferOffset, 
+                                        uboPool->uboEntries[renderItems[i].transformUboId - 1].bufferOffset};
+        vkCmdBindDescriptorSets(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines[pipelineId].pipelineLayout,
+            uboPool->uboEntries[renderItems[i].transformUboId - 1].bufferIdx, 1, pipelines[pipelineId].sets.data(), 2, setDynamicRange);
+    }
 
     vkCmdDrawIndexed(vkResources.cmdBuffer, meshCollections[meshCollectionIdx].indexCount[0],
         1, meshCollections[meshCollectionIdx].ibOffset[0], meshCollections[meshCollectionIdx].vbOffset[0], 1);
@@ -540,39 +556,48 @@ void Renderer::CreateComputeLayout()
     EXIT_ON_VK_ERROR(vkCreatePipelineLayout(vkResources.device, &layoutInfo, nullptr, &GET_PIPELINE(PipelineTypes::Compute).pipelineLayout));
 }
 
-void Renderer::CreateDescriptorSets()
+void Renderer::CreatePipelinePools()
 {
-    
-    GET_PIPELINE(PipelineTypes::Compute).sets.resize(vkResources.renderTextures.size());
+    VkDescriptorPoolSize computePoolSize[1] = {};
+    computePoolSize[0].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    computePoolSize[0].descriptorCount = CL_STORAGE_IMAGES * vkResources.renderTextures.size();
 
-    VkDescriptorPoolSize poolSize[2] = {};
-    poolSize[0].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    poolSize[0].descriptorCount = CL_STORAGE_IMAGES * vkResources.renderTextures.size();
-    poolSize[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-    poolSize[1].descriptorCount = 2 * 2;
+    GET_PIPELINE(PipelineTypes::Compute).maxSets = vkResources.renderTextures.size();
+    VkDescriptorPoolCreateInfo computePoolDesc = {};
+    computePoolDesc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    computePoolDesc.maxSets = vkResources.renderTextures.size();
+    computePoolDesc.poolSizeCount = 1;
+    computePoolDesc.pPoolSizes = computePoolSize;
+    EXIT_ON_VK_ERROR(vkCreateDescriptorPool(vkResources.device, &computePoolDesc, nullptr, &GET_PIPELINE(PipelineTypes::Compute).descriptorPool));
 
-    VkDescriptorPoolCreateInfo poolDesc = {};
-    poolDesc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolDesc.maxSets = vkResources.renderTextures.size() + 2;
-    poolDesc.poolSizeCount = 2;
-    poolDesc.pPoolSizes = poolSize;
-    EXIT_ON_VK_ERROR(vkCreateDescriptorPool(vkResources.device, &poolDesc, nullptr, &pipelinesPool));
 
+    GET_PIPELINE(PipelineTypes::Graphics).maxSets = 6;
+    GET_PIPELINE(PipelineTypes::GraphicsNonFill).maxSets = GET_PIPELINE(PipelineTypes::Graphics).maxSets;
+    VkDescriptorPoolSize gfxPoolSize[1] = {};
+    gfxPoolSize[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    gfxPoolSize[0].descriptorCount = GFX_ENTRY_COUNT * GET_PIPELINE(PipelineTypes::Graphics).maxSets; // meaningless default value
+
+    VkDescriptorPoolCreateInfo gfxPoolDesc = {};
+    gfxPoolDesc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    gfxPoolDesc.maxSets = GET_PIPELINE(PipelineTypes::Graphics).maxSets; // meaningless default value 
+    gfxPoolDesc.poolSizeCount = 1;
+    gfxPoolDesc.pPoolSizes = gfxPoolSize;
+    EXIT_ON_VK_ERROR(vkCreateDescriptorPool(vkResources.device, &gfxPoolDesc, nullptr, &GET_PIPELINE(PipelineTypes::Graphics).descriptorPool));
+    EXIT_ON_VK_ERROR(vkCreateDescriptorPool(vkResources.device, &gfxPoolDesc, nullptr, &GET_PIPELINE(PipelineTypes::GraphicsNonFill).descriptorPool));
+}
+
+void Renderer::UpdateComputeSets()
+{
     vector<VkDescriptorSetLayout> layouts(vkResources.renderTextures.size(), GET_PIPELINE(PipelineTypes::Compute).descriptorSetLayout);
-    layouts.push_back(GET_PIPELINE(PipelineTypes::Graphics).descriptorSetLayout);
-    layouts.push_back(GET_PIPELINE(PipelineTypes::GraphicsNonFill).descriptorSetLayout);
-
-    vector<VkDescriptorSet> sets(vkResources.renderTextures.size() + 2);
+    vector<VkDescriptorSet> sets(vkResources.renderTextures.size());
     VkDescriptorSetAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = pipelinesPool;
+    allocInfo.descriptorPool = GET_PIPELINE(PipelineTypes::Compute).descriptorPool;
     allocInfo.descriptorSetCount = layouts.size();
     allocInfo.pSetLayouts = layouts.data();
 
-    EXIT_ON_VK_ERROR(vkAllocateDescriptorSets(vkResources.device, &allocInfo, sets.data()));
-    copy(sets.begin(), sets.begin() + vkResources.renderTextures.size(), GET_PIPELINE(PipelineTypes::Compute).sets.begin());
-    GET_PIPELINE(PipelineTypes::Graphics).sets.push_back(sets[vkResources.renderTextures.size()]);
-    GET_PIPELINE(PipelineTypes::GraphicsNonFill).sets.push_back(sets[vkResources.renderTextures.size() + 1]);
+    GET_PIPELINE(PipelineTypes::Compute).sets.resize(vkResources.renderTextures.size());
+    EXIT_ON_VK_ERROR(vkAllocateDescriptorSets(vkResources.device, &allocInfo, GET_PIPELINE(PipelineTypes::Compute).sets.data()) );
 
     for (size_t i = 0; i < vkResources.renderTextures.size(); i++)
     {
@@ -603,6 +628,25 @@ void Renderer::CreateDescriptorSets()
         computeWrite[CL_COMPUTE_TEXTURE].pImageInfo = &computeImgInfo[CL_COMPUTE_TEXTURE];
 
         vkUpdateDescriptorSets(vkResources.device, CL_STORAGE_IMAGES, computeWrite, 0, nullptr);
+    }
+}
+
+void Renderer::CreateGraphicsSets()
+{
+    for (size_t pipelineId = 1; pipelineId < pipelines.size(); pipelineId++)
+    {
+        VulkanPipelineData* pipeline = &pipelines[pipelineId];
+        pipeline->sets.resize(pipeline->maxSets);
+
+        vector<VkDescriptorSetLayout> layouts(pipeline->maxSets, pipeline->descriptorSetLayout);
+        vector<VkDescriptorSet> sets(pipeline->maxSets);
+        VkDescriptorSetAllocateInfo allocInfo = {};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = pipeline->descriptorPool;
+        allocInfo.descriptorSetCount = layouts.size();
+        allocInfo.pSetLayouts = layouts.data();
+
+        EXIT_ON_VK_ERROR(vkAllocateDescriptorSets(vkResources.device, &allocInfo, pipeline->sets.data()));
     }
 }
 

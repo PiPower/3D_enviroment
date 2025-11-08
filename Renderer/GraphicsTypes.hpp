@@ -10,13 +10,18 @@ struct VulkanPipelineData
 	VkDescriptorSetLayout descriptorSetLayout;
 	VkPipelineLayout pipelineLayout;
 	std::vector<VkDescriptorSet> sets;
-	VkWriteDescriptorSet updateGfxSet[2];
-	VkDescriptorBufferInfo buffInfos[2];
+	VkDescriptorPool descriptorPool;
+	size_t boundPoolId;
+	size_t boundCameraUboId;
+	uint32_t maxSets;
 };
 
 struct RenderItem
 {
-	uint64_t meshIdx;
+	uint32_t vertexOffset;
+	uint32_t indexOffset;
+	uint64_t transformUboId;
+	uint32_t indexCount;
 };
 
 struct MeshCollection
