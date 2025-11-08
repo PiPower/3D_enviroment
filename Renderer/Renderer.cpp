@@ -3,7 +3,8 @@
 #include "errors.hpp"
 #include "CommonShapes.hpp"
 using namespace std;
-static constexpr uint32_t MAX_UBO_POOL_SIZE = 65536;
+static constexpr uint32_t MAX_UBO_POOL_SIZE = 65536; // value from vulkan spec v1.4
+static constexpr uint32_t UBO_BUFFER_RESOURCE_TYPE = 0;
 
 #define GET_PIPELINE(type) pipelines[static_cast<uint32_t>(type)]
 #define GET_BASE_SHAPE(name) baseShapesTable[static_cast<uint32_t>(name)]
@@ -99,7 +100,8 @@ int64_t Renderer::UpdateUboMemory(
     {
         return -2;
     }
-    memcpy(uboPoolEntry->memoryMap, buff, uboPoolEntry->uboPool.bufferInfos[uboPoolEntry->uboEntries[uboId - 1].resourceId].size);
+    UboEntry* entry = &uboPoolEntry->uboEntries[uboId - 1];
+    memcpy(uboPoolEntry->memoryMap + entry->bufferIdx * MAX_UBO_POOL_SIZE, buff, uboPoolEntry->uboPool.bufferInfos[entry->resourceId].size);
     return 0;
 }
 
@@ -116,24 +118,23 @@ int64_t Renderer::CreateUboPool(
         return VULKAN_RENDERER_ERROR;
     }
 
-    if (poolSize > MAX_UBO_POOL_SIZE)
-    {
-        return  VULKAN_RENDERER_ERROR;
-    }
-
     if (poolSize == 0)
     {
         poolSize = MAX_UBO_POOL_SIZE;
     }
 
+    poolSize += MAX_UBO_POOL_SIZE - poolSize % MAX_UBO_POOL_SIZE ;
     newPoolEntry->uboPool = {};
-    EXIT_ON_VK_ERROR(allocateMemoryPool(vkResources.device, vkResources.physicalDevice, poolSize, {poolSize, globalUboSize, localUboSize},
+    EXIT_ON_VK_ERROR(allocateMemoryPool(vkResources.device, vkResources.physicalDevice, poolSize, {MAX_UBO_POOL_SIZE, globalUboSize, localUboSize},
         {VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT},
         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
         &newPoolEntry->uboPool));
 
-    EXIT_ON_VK_ERROR(createBufferInPool(0, vkResources.device, &newPoolEntry->uboPool));
-    EXIT_ON_VK_ERROR(vkMapMemory(vkResources.device, newPoolEntry->uboPool.deviceMemory, 0, newPoolEntry->uboPool.bufferInfos[0].size, 0, (void**) &newPoolEntry->memoryMap));
+    while (newPoolEntry->uboPool.currOffset < newPoolEntry->uboPool.poolSize)
+    {
+        EXIT_ON_VK_ERROR(createBufferInPool(0, vkResources.device, &newPoolEntry->uboPool));
+    }
+    EXIT_ON_VK_ERROR(vkMapMemory(vkResources.device, newPoolEntry->uboPool.deviceMemory, 0, poolSize, 0, (void**) &newPoolEntry->memoryMap));
     
     *createdPoolId = uboPoolEntries.size();
     return 0;
@@ -155,17 +156,32 @@ int64_t Renderer::AllocateUboResource(
         return -1;
     }
 
-    UboEntry uboDesc = {};
-    uboDesc.resourceId = resourceId;
-    SET_UBO_ENTRY_ALIVE(&uboDesc);
     const VkMemoryRequirements& resourceReqs = uboPoolEntry->uboPool.resourceReqs[resourceId];
     const VkBufferCreateInfo resourceInfo = uboPoolEntry->uboPool.bufferInfos[resourceId];
     VkDeviceSize memoryUpdateSize;
-    EXIT_ON_VK_ERROR(findOffsetInBuffer(uboPoolEntry->poolOffset, resourceReqs.alignment, resourceReqs.size,
-                    uboPoolEntry->uboPool.poolSize, resourceInfo.size, &uboDesc.bufferOffset, &memoryUpdateSize) );
+    UboEntry uboDesc = {};
+    uboDesc.resourceId = resourceId;
+    uboDesc.bufferIdx = uboPoolEntry->bufferIdx;
+    SET_UBO_ENTRY_ALIVE(&uboDesc);
+
+    VkResult result = findOffsetInBuffer(uboPoolEntry->bufferOffset, resourceReqs.alignment, resourceReqs.size,
+                        uboPoolEntry->uboPool.poolSize, resourceInfo.size, &uboDesc.bufferOffset, &memoryUpdateSize);
+    if (result == VK_ERROR_TOO_MANY_OBJECTS)
+    {
+        if (uboPoolEntry->bufferIdx + 1 >= uboPoolEntry->uboPool.boundBuffers.size())
+        {
+            return VK_ERROR_TOO_MANY_OBJECTS;
+        }
+        uboPoolEntry->bufferIdx++;
+        uboDesc.bufferIdx = uboPoolEntry->bufferIdx;
+        uboPoolEntry->bufferOffset = 0;
+        EXIT_ON_VK_ERROR(findOffsetInBuffer(uboPoolEntry->bufferOffset, resourceReqs.alignment, resourceReqs.size,
+            uboPoolEntry->uboPool.poolSize, resourceInfo.size, &uboDesc.bufferOffset, &memoryUpdateSize));
+    }
 
     uboPoolEntry->uboEntries.push_back(uboDesc);
-    uboPoolEntry->poolOffset += memoryUpdateSize;
+    uboPoolEntry->bufferOffset += memoryUpdateSize;
+
     *allocatedUboId = uboPoolEntry->uboEntries.size();
 
     return 0;
@@ -173,7 +189,8 @@ int64_t Renderer::AllocateUboResource(
 
 int64_t Renderer::BindUboPoolToPipeline(
     uint64_t pipelineId,
-    uint64_t uboPoolId)
+    uint64_t uboPoolId,
+    uint64_t cameraUboId)
 {
     if (pipelineId > pipelines.size())
     {
@@ -185,35 +202,33 @@ int64_t Renderer::BindUboPoolToPipeline(
     }
     VulkanPipelineData* pipelineData = &pipelines[pipelineId];
     UboPoolEntry* uboPoolEntry = &uboPoolEntries[uboPoolId - 1];
+    UboEntry* camUbo = &uboPoolEntry->uboEntries[cameraUboId - 1];
 
-    VkWriteDescriptorSet updateGfxSet[GFX_ENTRY_COUNT] = {};
-    VkDescriptorBufferInfo buffInfos[GFX_ENTRY_COUNT] = {};
-     
-    buffInfos[GFX_CAMERA_UBO].buffer = uboPoolEntry->uboPool.boundBuffers[0];
-    buffInfos[GFX_CAMERA_UBO].offset = 0;
-    buffInfos[GFX_CAMERA_UBO].range = uboPoolEntry->uboPool.poolSize;
+    pipelineData->buffInfos[GFX_CAMERA_UBO].buffer = uboPoolEntry->uboPool.boundBuffers[camUbo->bufferIdx];
+    pipelineData->buffInfos[GFX_CAMERA_UBO].offset = 0;
+    pipelineData->buffInfos[GFX_CAMERA_UBO].range = uboPoolEntry->uboPool.bufferInfos[UBO_BUFFER_RESOURCE_TYPE].size;
 
-    buffInfos[GFX_OBJECT_UBO].buffer = uboPoolEntry->uboPool.boundBuffers[0];
-    buffInfos[GFX_OBJECT_UBO].offset = 0;
-    buffInfos[GFX_OBJECT_UBO].range = uboPoolEntry->uboPool.poolSize;
+    pipelineData->buffInfos[GFX_OBJECT_UBO].buffer = uboPoolEntry->uboPool.boundBuffers[0];
+    pipelineData->buffInfos[GFX_OBJECT_UBO].offset = 0;
+    pipelineData->buffInfos[GFX_OBJECT_UBO].range = uboPoolEntry->uboPool.bufferInfos[UBO_BUFFER_RESOURCE_TYPE].size;
 
-    updateGfxSet[GFX_CAMERA_UBO].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    updateGfxSet[GFX_CAMERA_UBO].dstSet = pipelineData->sets[0];
-    updateGfxSet[GFX_CAMERA_UBO].dstBinding = GFX_CAMERA_UBO;
-    updateGfxSet[GFX_CAMERA_UBO].dstArrayElement = 0;
-    updateGfxSet[GFX_CAMERA_UBO].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-    updateGfxSet[GFX_CAMERA_UBO].descriptorCount = 1;
-    updateGfxSet[GFX_CAMERA_UBO].pBufferInfo = &buffInfos[GFX_CAMERA_UBO];
+    pipelineData->updateGfxSet[GFX_CAMERA_UBO].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    pipelineData->updateGfxSet[GFX_CAMERA_UBO].dstSet = pipelineData->sets[0];
+    pipelineData->updateGfxSet[GFX_CAMERA_UBO].dstBinding = GFX_CAMERA_UBO;
+    pipelineData->updateGfxSet[GFX_CAMERA_UBO].dstArrayElement = 0;
+    pipelineData->updateGfxSet[GFX_CAMERA_UBO].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    pipelineData->updateGfxSet[GFX_CAMERA_UBO].descriptorCount = 1;
+    pipelineData->updateGfxSet[GFX_CAMERA_UBO].pBufferInfo = &pipelineData->buffInfos[GFX_CAMERA_UBO];
 
-    updateGfxSet[GFX_OBJECT_UBO].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    updateGfxSet[GFX_OBJECT_UBO].dstSet = pipelineData->sets[0];
-    updateGfxSet[GFX_OBJECT_UBO].dstBinding = GFX_OBJECT_UBO;
-    updateGfxSet[GFX_OBJECT_UBO].dstArrayElement = 0;
-    updateGfxSet[GFX_OBJECT_UBO].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-    updateGfxSet[GFX_OBJECT_UBO].descriptorCount = 1;
-    updateGfxSet[GFX_OBJECT_UBO].pBufferInfo = &buffInfos[GFX_OBJECT_UBO];
+    pipelineData->updateGfxSet[GFX_OBJECT_UBO].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    pipelineData->updateGfxSet[GFX_OBJECT_UBO].dstSet = pipelineData->sets[0];
+    pipelineData->updateGfxSet[GFX_OBJECT_UBO].dstBinding = GFX_OBJECT_UBO;
+    pipelineData->updateGfxSet[GFX_OBJECT_UBO].dstArrayElement = 0;
+    pipelineData->updateGfxSet[GFX_OBJECT_UBO].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    pipelineData->updateGfxSet[GFX_OBJECT_UBO].descriptorCount = 1;
+    pipelineData->updateGfxSet[GFX_OBJECT_UBO].pBufferInfo = &pipelineData->buffInfos[GFX_OBJECT_UBO];
 
-    vkUpdateDescriptorSets(vkResources.device, 2, updateGfxSet, 0, nullptr);
+    vkUpdateDescriptorSets(vkResources.device, 2, pipelineData->updateGfxSet, 0, nullptr);
     return 0;
 }
 
@@ -228,6 +243,7 @@ void Renderer::Render(
     VkDeviceSize offsets[] = { 0 };
     UboPoolEntry* uboPool = &uboPoolEntries[cameraUboPoolId - 1];
     uint32_t setDynamicRange[2] = { uboPool->uboEntries[cameraUboId - 1].bufferOffset, 0};
+
     vkCmdBindPipeline(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines[pipelineId].pipeline);
     vkCmdBindVertexBuffers(vkResources.cmdBuffer, 0, 1, &meshCollections[meshCollectionIdx].vertexBuffer.buffer, offsets);
     vkCmdBindIndexBuffer(vkResources.cmdBuffer, meshCollections[meshCollectionIdx].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT16);

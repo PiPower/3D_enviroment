@@ -13,6 +13,10 @@ enum class PipelineTypes
 	GraphicsNonFill
 };
 
+struct RenderItem
+{
+
+};
 
 class Renderer
 {
@@ -45,8 +49,8 @@ public:
 
 	int64_t BindUboPoolToPipeline(
 		uint64_t pipelineId,
-		uint64_t uboPoolId
-	);
+		uint64_t uboPoolId,
+		uint64_t cameraUboId);
 
 	uint64_t CreateRenderItem(
 		uint64_t meshCollectionId,

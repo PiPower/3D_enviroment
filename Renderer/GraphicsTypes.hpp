@@ -10,6 +10,8 @@ struct VulkanPipelineData
 	VkDescriptorSetLayout descriptorSetLayout;
 	VkPipelineLayout pipelineLayout;
 	std::vector<VkDescriptorSet> sets;
+	VkWriteDescriptorSet updateGfxSet[2];
+	VkDescriptorBufferInfo buffInfos[2];
 };
 
 struct RenderItem
@@ -68,6 +70,7 @@ struct UboEntry
 {
 	VkDeviceSize bufferOffset;
 	uint64_t resourceId;
+	size_t bufferIdx;
 	// bit 0: is alive
 	int32_t traits;
 };
@@ -79,7 +82,8 @@ struct UboPoolEntry
 {
 	std::vector<UboEntry> uboEntries;
 	MemoryPool uboPool;
-	VkDeviceSize poolOffset;
+	VkDeviceSize bufferOffset;
+	size_t bufferIdx;
 	char* memoryMap;
 };
 

@@ -418,11 +418,11 @@ VkResult createBufferInPool(
 	VkDeviceSize resourceOffset, memoryUpdateSize;
 	const VkMemoryRequirements& resourceReq = pool->resourceReqs[resourceIdx];
 	const VkBufferCreateInfo resourceInfo = pool->bufferInfos[resourceIdx];
-	findOffsetInBuffer(pool->currOffset, resourceReq.alignment, resourceReq.size,
-				pool->poolSize, resourceInfo.size, &resourceOffset, &memoryUpdateSize);
-
 	VkBuffer buffer = nullptr;
 	VkResult result;
+
+	JUMP_TO_ON_VK_ERROR(result =  findOffsetInBuffer(pool->currOffset, resourceReq.alignment, resourceReq.size,
+				pool->poolSize, resourceInfo.size, &resourceOffset, &memoryUpdateSize), clean) ;
 	JUMP_TO_ON_VK_ERROR(result = vkCreateBuffer(device, &pool->bufferInfos[resourceIdx], nullptr, &buffer), clean);
 	JUMP_TO_ON_VK_ERROR(result = vkBindBufferMemory(device, buffer, pool->deviceMemory, resourceOffset), clean);
 	/*
