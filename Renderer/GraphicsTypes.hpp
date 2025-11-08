@@ -21,7 +21,7 @@ struct RenderItem
 	uint32_t vertexOffset;
 	uint32_t indexOffset;
 	uint64_t transformUboId;
-	uint32_t indexCount;
+	uint32_t indexCountOffset;
 };
 
 struct MeshCollection

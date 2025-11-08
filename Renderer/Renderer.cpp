@@ -211,37 +211,40 @@ int64_t Renderer::BindUboPoolToPipeline(
     UboPoolEntry* uboPoolEntry = &uboPoolEntries[uboPoolId - 1];
     UboEntry* camUbo = &uboPoolEntry->uboEntries[cameraUboId - 1];
 
-    VkWriteDescriptorSet updateGfxSet[2];
-    VkDescriptorBufferInfo buffInfos[2];
-
     pipelineData->boundPoolId = uboPoolId;
     pipelineData->boundCameraUboId = cameraUboId;
 
-    buffInfos[GFX_CAMERA_UBO].buffer = uboPoolEntry->uboPool.boundBuffers[camUbo->bufferIdx];
-    buffInfos[GFX_CAMERA_UBO].offset = 0;
-    buffInfos[GFX_CAMERA_UBO].range = uboPoolEntry->uboPool.bufferInfos[UBO_BUFFER_RESOURCE_TYPE].size;
+    for (size_t i = 0; i < uboPoolEntries[uboPoolId - 1].uboPool.boundBuffers.size(); i++)
+    {
+        VkWriteDescriptorSet updateGfxSet[2] = {};
+        VkDescriptorBufferInfo buffInfos[2] = {};
 
-    buffInfos[GFX_OBJECT_UBO].buffer = uboPoolEntry->uboPool.boundBuffers[0];
-    buffInfos[GFX_OBJECT_UBO].offset = 0;
-    buffInfos[GFX_OBJECT_UBO].range = uboPoolEntry->uboPool.bufferInfos[UBO_BUFFER_RESOURCE_TYPE].size;
+        buffInfos[GFX_CAMERA_UBO].buffer = uboPoolEntry->uboPool.boundBuffers[camUbo->bufferIdx];
+        buffInfos[GFX_CAMERA_UBO].offset = 0;
+        buffInfos[GFX_CAMERA_UBO].range = uboPoolEntry->uboPool.bufferInfos[UBO_BUFFER_RESOURCE_TYPE].size;
 
-    updateGfxSet[GFX_CAMERA_UBO].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    updateGfxSet[GFX_CAMERA_UBO].dstSet = pipelineData->sets[0];
-    updateGfxSet[GFX_CAMERA_UBO].dstBinding = GFX_CAMERA_UBO;
-    updateGfxSet[GFX_CAMERA_UBO].dstArrayElement = 0;
-    updateGfxSet[GFX_CAMERA_UBO].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-    updateGfxSet[GFX_CAMERA_UBO].descriptorCount = 1;
-    updateGfxSet[GFX_CAMERA_UBO].pBufferInfo = &buffInfos[GFX_CAMERA_UBO];
+        buffInfos[GFX_OBJECT_UBO].buffer = uboPoolEntry->uboPool.boundBuffers[i];
+        buffInfos[GFX_OBJECT_UBO].offset = 0;
+        buffInfos[GFX_OBJECT_UBO].range = uboPoolEntry->uboPool.bufferInfos[UBO_BUFFER_RESOURCE_TYPE].size;
 
-    updateGfxSet[GFX_OBJECT_UBO].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    updateGfxSet[GFX_OBJECT_UBO].dstSet = pipelineData->sets[0];
-    updateGfxSet[GFX_OBJECT_UBO].dstBinding = GFX_OBJECT_UBO;
-    updateGfxSet[GFX_OBJECT_UBO].dstArrayElement = 0;
-    updateGfxSet[GFX_OBJECT_UBO].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-    updateGfxSet[GFX_OBJECT_UBO].descriptorCount = 1;
-    updateGfxSet[GFX_OBJECT_UBO].pBufferInfo = &buffInfos[GFX_OBJECT_UBO];
+        updateGfxSet[GFX_CAMERA_UBO].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        updateGfxSet[GFX_CAMERA_UBO].dstSet = pipelineData->sets[i];
+        updateGfxSet[GFX_CAMERA_UBO].dstBinding = GFX_CAMERA_UBO;
+        updateGfxSet[GFX_CAMERA_UBO].dstArrayElement = 0;
+        updateGfxSet[GFX_CAMERA_UBO].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+        updateGfxSet[GFX_CAMERA_UBO].descriptorCount = 1;
+        updateGfxSet[GFX_CAMERA_UBO].pBufferInfo = &buffInfos[GFX_CAMERA_UBO];
 
-    vkUpdateDescriptorSets(vkResources.device, 2, updateGfxSet, 0, nullptr);
+        updateGfxSet[GFX_OBJECT_UBO].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        updateGfxSet[GFX_OBJECT_UBO].dstSet = pipelineData->sets[i];
+        updateGfxSet[GFX_OBJECT_UBO].dstBinding = GFX_OBJECT_UBO;
+        updateGfxSet[GFX_OBJECT_UBO].dstArrayElement = 0;
+        updateGfxSet[GFX_OBJECT_UBO].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+        updateGfxSet[GFX_OBJECT_UBO].descriptorCount = 1;
+        updateGfxSet[GFX_OBJECT_UBO].pBufferInfo = &buffInfos[GFX_OBJECT_UBO];
+
+        vkUpdateDescriptorSets(vkResources.device, 1, updateGfxSet, 0, nullptr);
+    }
     return 0;
 }
 
@@ -250,13 +253,13 @@ void Renderer::Render(
     uint64_t pipelineId,
     const std::vector<RenderItem>& renderItems)
 {
-    uint64_t meshCollectionIdx = meshCollectionId - 1;
+    MeshCollection* collection = &meshCollections[meshCollectionId - 1];
     VkDeviceSize offsets[] = { 0 };
     UboPoolEntry* uboPool = &uboPoolEntries[pipelines[pipelineId].boundPoolId - 1];
 
     vkCmdBindPipeline(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines[pipelineId].pipeline);
-    vkCmdBindVertexBuffers(vkResources.cmdBuffer, 0, 1, &meshCollections[meshCollectionIdx].vertexBuffer.buffer, offsets);
-    vkCmdBindIndexBuffer(vkResources.cmdBuffer, meshCollections[meshCollectionIdx].indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT16);
+    vkCmdBindVertexBuffers(vkResources.cmdBuffer, 0, 1, &collection->vertexBuffer.buffer, offsets);
+    vkCmdBindIndexBuffer(vkResources.cmdBuffer, collection->indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT16);
 
     for (size_t i = 0; i < renderItems.size(); i++)
     {
@@ -264,10 +267,11 @@ void Renderer::Render(
                                         uboPool->uboEntries[renderItems[i].transformUboId - 1].bufferOffset};
         vkCmdBindDescriptorSets(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines[pipelineId].pipelineLayout,
             uboPool->uboEntries[renderItems[i].transformUboId - 1].bufferIdx, 1, pipelines[pipelineId].sets.data(), 2, setDynamicRange);
+
+        vkCmdDrawIndexed(vkResources.cmdBuffer, collection->indexCount[renderItems[i].indexCountOffset],
+            1, collection->ibOffset[renderItems[i].indexOffset], collection->vbOffset[renderItems[i].vertexOffset], 1);
     }
 
-    vkCmdDrawIndexed(vkResources.cmdBuffer, meshCollections[meshCollectionIdx].indexCount[0],
-        1, meshCollections[meshCollectionIdx].ibOffset[0], meshCollections[meshCollectionIdx].vbOffset[0], 1);
 }
 
 
