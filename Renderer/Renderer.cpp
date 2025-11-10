@@ -176,6 +176,7 @@ int64_t Renderer::AllocateUboResource(
         }
         uboPoolEntry->bufferIdx++;
         uboDesc.bufferIdx = uboPoolEntry->bufferIdx;
+        uboPoolEntry->bufferOffset = 0;
         EXIT_ON_VK_ERROR(findOffsetInBuffer(uboPoolEntry->bufferOffset, resourceReqs.alignment, resourceReqs.size,
             uboPoolEntry->uboPool.poolSize, resourceInfo.size, &uboDesc.bufferOffset, &memoryUpdateSize));
     }

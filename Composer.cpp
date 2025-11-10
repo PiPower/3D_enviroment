@@ -1,9 +1,10 @@
 #include "Composer.hpp"
 #include "Renderer/CommonShapes.hpp"
+#include <random>
 using namespace DirectX;
 using namespace std;
 
-static constexpr XMFLOAT3 eyeInitial = { 0.0f, 0.0f, 0.0f };
+static constexpr XMFLOAT3 eyeInitial = { 0.0f, 1.0f, 0.0f };
 static constexpr XMFLOAT3 lookDirInitial = { 0.0f, 0.0f, 1.0f };
 static constexpr XMFLOAT3 upInitial = { 0.0f, 1.0f, 0.0f };
 Composer::Composer(Renderer* renderer)
@@ -12,7 +13,7 @@ Composer::Composer(Renderer* renderer)
 {
     vector<GeometryEntry> boxGeo({ GeometryType::Box });
     renderer->CreateMeshCollection(boxGeo, &boxCollection);
-    renderer->CreateUboPool(sizeof(Camera), sizeof(ObjectTransform), 150'000, &uboPool);
+    renderer->CreateUboPool(sizeof(Camera), sizeof(ObjectTransform), 300'000, &uboPool);
     renderer->AllocateUboResource(uboPool, UBO_CAMERA_RESOURCE_TYPE, &cameraUbo);
     renderer->BindUboPoolToPipeline((uint64_t)PipelineTypes::Graphics, uboPool, cameraUbo);
 
@@ -44,11 +45,33 @@ void Composer::UpdateCamera()
 
 void Composer::GenerateObjects()
 {
+    std::random_device rd;  // Will be used to obtain a seed for the random number engine
+    std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
+    std::uniform_real_distribution<> dis(0, 1.0);
+
+    for (int i = 0; i < 10; i++)
+    {
+        for (int j = 0; j < 10; j++)
+        {
+            ObjectTransform objTransform;
+            XMStoreFloat4x4(&objTransform.transform, XMMatrixTranslation(-10 + i * 2, 0, -10 + j * 2));
+            objTransform.color[0] = dis(gen);
+            objTransform.color[1] = dis(gen);
+            objTransform.color[2] = dis(gen);
+            objTransform.color[3] = 1.0f;
+            entities.push_back({ objTransform });
+
+            uint64_t rectUbo;
+            renderer->AllocateUboResource(uboPool, UBO_OBJ_TRSF_RESOURCE_TYPE, &rectUbo);
+            renderEntities.push_back({ 0, 0, rectUbo, 0 });
+        }
+    }
+
     ObjectTransform objTransform;
-    XMStoreFloat4x4(&objTransform.transform, XMMatrixTranslation(0.0, 0, 2.0));
-    objTransform.color[0] = 1.0f;
-    objTransform.color[1] = 1.0f;
-    objTransform.color[2] = 1.0f;
+    XMStoreFloat4x4(&objTransform.transform, XMMatrixScaling(20, 1, 20) * XMMatrixTranslation(0, -3, 0));
+    objTransform.color[0] = dis(gen);
+    objTransform.color[1] = dis(gen);
+    objTransform.color[2] = dis(gen);
     objTransform.color[3] = 1.0f;
     entities.push_back({ objTransform });
 
