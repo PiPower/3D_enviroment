@@ -36,6 +36,9 @@
     <ClCompile Include="Renderer\CommonShapes.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Composer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Renderer\VulkanResources.hpp">
@@ -60,6 +63,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Renderer\CommonShapes.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Composer.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

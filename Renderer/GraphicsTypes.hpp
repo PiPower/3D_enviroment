@@ -69,6 +69,7 @@ struct Camera
 struct ObjectTransform
 {
 	DirectX::XMFLOAT4X4 transform;
+	float color[4];
 };
 
 struct UboEntry

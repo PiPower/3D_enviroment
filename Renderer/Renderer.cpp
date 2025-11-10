@@ -401,7 +401,7 @@ cleanup:
 void Renderer::CreateControllingStructs()
 {
     static 	VkClearValue clearColor[2];
-    clearColor[1].color = { {0.2f, 0.8f, 0.2f, 1.0f} };
+    clearColor[1].color = { {0.3f, 0.3f, 1.0f, 1.0f} };
     clearColor[0].depthStencil = { 1.0f, 0 };
 
     renderPassInfos.resize(vkResources.swapchainFramebuffers.size());

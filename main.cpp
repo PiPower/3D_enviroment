@@ -1,48 +1,28 @@
 #include "window.hpp"
 #include "Renderer/Renderer.hpp"
+#include "Composer.hpp"
 
 using namespace std;
-using namespace DirectX;
 
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 {
     Window wnd(1600, 900, L"yolo", L"test");
     Renderer renderer(hInstance, wnd.GetWindowHWND());
-    Camera camera = {};
-    ObjectTransform objTransform;
+    Composer comp(&renderer);
 
-    XMStoreFloat4x4(&objTransform.transform, XMMatrixTranslation(0.5, 0, 0));
-
-    XMVECTOR eyePos, lookAt, up;
-    XMFLOAT3 eyePosFloat{0.0f, 0.0f, -2}, lookAtFloat{0.0f, 0.0f, 1.0f}, upFloat{0.0f, 1.0f, 0.0f};
-    eyePos = XMLoadFloat3(&eyePosFloat);
-    lookAt = XMLoadFloat3(&lookAtFloat);
-    up = XMLoadFloat3(&upFloat);
-
-    XMStoreFloat4x4(&camera.view, XMMatrixLookToLH(eyePos, lookAt, up));
-    XMStoreFloat4x4(&camera.proj, XMMatrixPerspectiveFovLH(3.14f / 4.0f, 1600.0f/900.0f, 0.1f, 90.0f));
-    camera.proj._22 *= -1.0f;// vulkan has -1.0f on top and 1.0f on bottom
-
-    vector<GeometryEntry> boxGeo({ GeometryType::Box});
-    uint64_t testCollection, uboPool, cameraUbo, rectUbo, rectUbo2;
-    renderer.CreateMeshCollection(boxGeo, &testCollection);
-    renderer.CreateUboPool(sizeof(Camera), sizeof(ObjectTransform), 150'000, &uboPool);
-    renderer.AllocateUboResource(uboPool, UBO_CAMERA_RESOURCE_TYPE, &cameraUbo);
-    renderer.AllocateUboResource(uboPool, UBO_OBJ_TRSF_RESOURCE_TYPE, &rectUbo2);
-    renderer.AllocateUboResource(uboPool, UBO_OBJ_TRSF_RESOURCE_TYPE, &rectUbo);
-    renderer.UpdateUboMemory(uboPool, cameraUbo, (char*) &camera);
-    renderer.UpdateUboMemory(uboPool, rectUbo, (char*)&objTransform);
-    renderer.BindUboPoolToPipeline((uint64_t)PipelineTypes::Graphics, uboPool, cameraUbo);
-    vector<RenderItem> items{ { 0, 0, rectUbo, 0 } };
-
+    float dt = 0;
     while (wnd.ProcessMessages() == 0)
     {
-        renderer.BeginRendering();
-        renderer.Render(testCollection, (uint64_t)PipelineTypes::Graphics, items);
-        renderer.Present();
+        auto t1 = chrono::high_resolution_clock::now();
+        comp.ProcessUserInput(&wnd, dt);
+        comp.RenderScene();
+
+        auto t2 = chrono::high_resolution_clock::now();
+        chrono::duration duration = t2 - t1;
+        dt = (float)duration.count() / 1'000'000'000.0f;
+
     }
 
 }
-
 
 
