@@ -102,7 +102,7 @@ void Composer::GenerateObjects()
 void Composer::UpdateObjects(
     float dt)
 {
-    physicsEngine->UpdateBodies(dt);
+    //physicsEngine->UpdateBodies(dt);
     for (size_t i = 0; i < physicsEntitiesTrsfm.size(); i++)
     {
         physicsEngine->GetTransformMatrixForBody(physicsEntities[i], &physicsEntitiesTrsfm[i].transform);
@@ -121,10 +121,12 @@ void Composer::ProcessUserInput(
     XMVECTOR upVec = XMLoadFloat3(&camOrientation.up);
     XMVECTOR lookDirVec = XMLoadFloat3(&camOrientation.lookDir);
 
+    XMVECTOR upInitialVec = XMLoadFloat3(&upInitial);
+
     if (window->IsKeyPressed('W')) { eyeVec = XMVectorAdd(eyeVec, XMVectorScale(lookDirVec, dt * 10.0f)); }
     if (window->IsKeyPressed('S')) { eyeVec = XMVectorSubtract(eyeVec, XMVectorScale(lookDirVec, dt * 10.0f)); }
-    if (window->IsKeyPressed(VK_SPACE)) { eyeVec = XMVectorAdd(eyeVec, XMVectorScale(upVec, dt * 10.0f)); }
-    if (window->IsKeyPressed(VK_CONTROL)) { eyeVec = XMVectorSubtract(eyeVec, XMVectorScale(upVec, dt * 10.0f)); }
+    if (window->IsKeyPressed(VK_SPACE)) { eyeVec = XMVectorAdd(eyeVec, XMVectorScale(upInitialVec, dt * 10.0f)); }
+    if (window->IsKeyPressed(VK_CONTROL)) { eyeVec = XMVectorSubtract(eyeVec, XMVectorScale(upInitialVec, dt * 10.0f)); }
     if (window->IsKeyPressed('D')) { eyeVec = XMVectorAdd(eyeVec, XMVectorScale(XMVector3Cross(upVec, lookDirVec), dt * 10.0f)); }
     if (window->IsKeyPressed('A')) { eyeVec = XMVectorSubtract(eyeVec, XMVectorScale(XMVector3Cross(upVec, lookDirVec), dt * 10.0f)); }
     if (window->IsLeftPressed())
@@ -147,11 +149,26 @@ void Composer::ProcessUserInput(
         {
             angleX += dt * 10.0f;
         }
+
+        /*
+        XMMATRIX azimRotation = XMMatrixRotationY(angleY);
+        lookDirVec = XMVector3Transform(XMLoadFloat3(&lookDirInitial), azimRotation);
+        upVec = XMVector3Transform(XMLoadFloat3(&upInitial), azimRotation);
+
+        XMVECTOR rotAxis = XMVector3Cross(upVec, lookDirVec);
+        XMMATRIX elevRotation = XMMatrixRotationAxis(rotAxis, angleX);
+        lookDirVec = XMVector3Transform(lookDirVec, elevRotation);
+        upVec = XMVector3Transform(upVec, elevRotation);*/
+
         // IMPORTANT: Order MATTERS !!!!
+        angleX = std::clamp(angleX, -3.14f / 2.0f, 3.14f / 2.0f);
+
         XMMATRIX rotMatrix = XMMatrixRotationX(angleX) * XMMatrixRotationY(angleY);
 
         lookDirVec = XMVector3Transform(XMLoadFloat3(&lookDirInitial), rotMatrix);
         upVec = XMVector3Transform(XMLoadFloat3(&upInitial), rotMatrix);
+
+
     }
 
     XMStoreFloat3(&camOrientation.eye, eyeVec);
