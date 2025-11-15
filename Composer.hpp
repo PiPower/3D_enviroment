@@ -26,7 +26,8 @@ struct Composer
 
 	void GenerateObjects();
 
-	void UpdateObjects();
+	void UpdateObjects(
+		float dt);
 
 	void ProcessUserInput(
 		Window* window,

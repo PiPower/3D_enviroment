@@ -30,7 +30,6 @@ Composer::Composer(
 void Composer::RenderScene()
 {
     UpdateCamera();
-    UpdateObjects();
 
     renderer->BeginRendering();
     renderer->Render(boxCollection, (uint64_t)PipelineTypes::Graphics, renderEntities);
@@ -100,8 +99,10 @@ void Composer::GenerateObjects()
 
 }
 
-void Composer::UpdateObjects()
+void Composer::UpdateObjects(
+    float dt)
 {
+    physicsEngine->UpdateBodies(dt);
     for (size_t i = 0; i < physicsEntitiesTrsfm.size(); i++)
     {
         physicsEngine->GetTransformMatrixForBody(physicsEntities[i], &physicsEntitiesTrsfm[i].transform);
@@ -111,7 +112,9 @@ void Composer::UpdateObjects()
 
 
 
-void Composer::ProcessUserInput(Window* window, float dt)
+void Composer::ProcessUserInput(
+    Window* window,
+    float dt)
 {
 
     XMVECTOR eyeVec = XMLoadFloat3(&camOrientation.eye);

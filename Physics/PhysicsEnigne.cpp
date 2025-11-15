@@ -45,7 +45,7 @@ int64_t PhysicsEnigne::AddBody(
 	DirectX::XMFLOAT3 scales,
 	bool isDynamic,
 	uint64_t* bodyId,
-	DirectX::XMFLOAT3 defaultForce)
+	DirectX::XMFLOAT3 constForce)
 {
 	Body body;
 	body.angVelocity = props.angVelocity;
@@ -57,7 +57,7 @@ int64_t PhysicsEnigne::AddBody(
 
 	if (isDynamic)
 	{
-		defaultForces.push_back(defaultForce);
+		constForces.push_back(constForce);
 		dynamicBodies.push_back(body);
 		*bodyId = dynamicBodies.size();
 		return 0;
@@ -81,5 +81,30 @@ int64_t PhysicsEnigne::GetTransformMatrixForBody(
 	XMMATRIX transform = XMLoadFloat4x4(mat);
 	transform = transform * XMMatrixTranslation(body->position.x, body->position.y, body->position.z);
 	XMStoreFloat4x4(mat, transform);
+	return 0;
+}
+
+int64_t PhysicsEnigne::UpdateBodies(float dt)
+{
+	for (size_t i = 0; i < dynamicBodies.size(); i++)
+	{
+		Body* body = &dynamicBodies[i];
+		float mass = 1.0f / body->massInv;
+
+		XMVECTOR constForce = XMLoadFloat3(&constForces[i]);
+		XMVECTOR Impulse = constForce * mass * dt;
+		XMVECTOR dv = Impulse * body->massInv;
+		XMVECTOR v = XMLoadFloat3(&body->linVelocity) + dv;
+		XMStoreFloat3(&body->linVelocity, v);
+	}
+
+	for (size_t i = 0; i < dynamicBodies.size(); i++)
+	{
+		Body* body = &dynamicBodies[i];
+		XMVECTOR position = XMLoadFloat3(&body->linVelocity) * dt + XMLoadFloat3(&body->position);
+		XMStoreFloat3(&body->position, position);
+	}
+
+
 	return 0;
 }

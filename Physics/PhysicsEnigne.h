@@ -12,11 +12,13 @@ struct PhysicsEnigne
 		DirectX::XMFLOAT3 scales,
 		bool isDynamic, 
 		uint64_t* bodyId,
-		DirectX::XMFLOAT3 defaultForce = {0, 9.8, 0});
+		DirectX::XMFLOAT3 constForce = {0, -2.8, 0});
 	
 	int64_t GetTransformMatrixForBody(
 		uint64_t bodyId,
 		DirectX::XMFLOAT4X4* mat);
+
+	int64_t UpdateBodies(float dt);
 
 private:
 	Body* GetBody(
@@ -26,7 +28,7 @@ private:
 
 private:
 	std::vector<Body> staticBodies;
-	std::vector<DirectX::XMFLOAT3> defaultForces; // per dynamic body
+	std::vector<DirectX::XMFLOAT3> constForces; // per dynamic body
 	std::vector<Body> dynamicBodies;
 
 };
