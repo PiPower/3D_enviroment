@@ -157,6 +157,8 @@
   <ItemGroup>
     <ClCompile Include="Composer.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Physics\PhysicsEnigne.cpp" />
+    <ClCompile Include="Physics\Shapes\ShapeBox.cpp" />
     <ClCompile Include="Renderer\CommonShapes.cpp" />
     <ClCompile Include="Renderer\Renderer.cpp" />
     <ClCompile Include="Renderer\errors.cpp" />
@@ -166,6 +168,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Composer.hpp" />
+    <ClInclude Include="Physics\Body.hpp" />
+    <ClInclude Include="Physics\PhysicsEnigne.h" />
+    <ClInclude Include="Physics\Shapes\Shape.hpp" />
+    <ClInclude Include="Physics\Shapes\ShapeBox.hpp" />
     <ClInclude Include="Renderer\CommonShapes.hpp" />
     <ClInclude Include="Renderer\GraphicsTypes.hpp" />
     <ClInclude Include="Renderer\Renderer.hpp" />

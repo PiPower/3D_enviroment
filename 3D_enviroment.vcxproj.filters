@@ -39,6 +39,12 @@
     <ClCompile Include="Composer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Physics\PhysicsEnigne.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Physics\Shapes\ShapeBox.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Renderer\VulkanResources.hpp">
@@ -66,6 +72,18 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Composer.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Physics\PhysicsEnigne.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Physics\Body.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Physics\Shapes\Shape.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Physics\Shapes\ShapeBox.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

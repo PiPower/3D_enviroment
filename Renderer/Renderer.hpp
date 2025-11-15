@@ -71,7 +71,7 @@ private:
 	void CreateBasicGraphicsPipelines();
 	void CreateGraphicsSets();
 	void UpdateComputeSets();
-public:
+private:
 	uint32_t imageIndex;
 	VkDeviceSize maxUboPoolSize;
 	VulkanResources vkResources;

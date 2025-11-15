@@ -1,6 +1,7 @@
 #include "window.hpp"
 #include "Renderer/Renderer.hpp"
 #include "Composer.hpp"
+#include "Physics/PhysicsEnigne.h"
 
 using namespace std;
 
@@ -8,7 +9,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 {
     Window wnd(1600, 900, L"yolo", L"test");
     Renderer renderer(hInstance, wnd.GetWindowHWND());
-    Composer comp(&renderer);
+    PhysicsEnigne physicsEngine{};
+    Composer comp(&renderer, &physicsEngine);
+
 
     float dt = 0;
     while (wnd.ProcessMessages() == 0)
