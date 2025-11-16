@@ -39,7 +39,7 @@ public:
 	float cameraAngleY;
 	uint64_t boxCollection;
 	uint64_t uboPool;
-	 
+	bool calculatePhysics;
 	// ----- Entity related -----
 	std::vector<uint64_t> physicsEntities;
 	std::vector<ObjectUbo> physicsEntitiesTrsfm;

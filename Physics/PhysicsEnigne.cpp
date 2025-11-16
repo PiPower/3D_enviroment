@@ -1,21 +1,46 @@
 #include "PhysicsEnigne.h"
 #include "Shapes//ShapeBox.hpp"
 #include <inttypes.h>
+#include "Intersection.hpp"
+
 using namespace std;
 using namespace DirectX;
 
 #define GET_BODY(id) if((id & STATIC_FLAG > 0) {staticBodies[(id & ~STATIC_FLAG) - 1];}else {dynamicBodies[(id & ~STATIC_FLAG) - 1];}
 constexpr static uint64_t STATIC_FLAG = 0x01ULL << 63;
-struct BoxDescirptor
-{
-	XMFLOAT3 front;
-};
 
-PhysicsEnigne::PhysicsEnigne()
+PhysicsEnigne::PhysicsEnigne(
+	size_t expectedDynamicBodies)
 {
+	// some arbitrary value, can be changed
+	contactPoints.resize(expectedDynamicBodies * expectedDynamicBodies * 2);
 }
 
-Body* PhysicsEnigne::GetBody(uint64_t bodyId)
+int64_t PhysicsEnigne::FindIntersections(float dt)
+{
+	size_t detectedIntersections = 0;
+	for (size_t i = 0; i < dynamicBodies.size(); i++)
+	{
+
+		for (size_t j = i + 1; i < dynamicBodies.size(); i++)
+		{
+			if (CheckIntersection(&dynamicBodies[i], &dynamicBodies[j], &contactPoints[detectedIntersections], dt))
+			{
+				detectedIntersections++;
+				if (detectedIntersections >= contactPoints.size())
+				{
+					Contact fill = {};
+					contactPoints.resize(contactPoints.size() * 4, fill);
+				}
+			}
+		}
+
+	}
+	return 0;
+}
+
+Body* PhysicsEnigne::GetBody(
+	uint64_t bodyId)
 {
 	if ((bodyId & STATIC_FLAG) > 0)
 	{ 
@@ -27,7 +52,9 @@ Body* PhysicsEnigne::GetBody(uint64_t bodyId)
 	}
 }
 
-Shape PhysicsEnigne::CreateDefaultShape(ShapeType type, DirectX::XMFLOAT3 scales)
+Shape PhysicsEnigne::CreateDefaultShape(
+	ShapeType type, 
+	DirectX::XMFLOAT3 scales)
 {
 	switch (type)
 	{
@@ -98,11 +125,11 @@ int64_t PhysicsEnigne::UpdateBodies(float dt)
 		XMStoreFloat3(&body->linVelocity, v);
 	}
 
+	FindIntersections(dt);
+
 	for (size_t i = 0; i < dynamicBodies.size(); i++)
 	{
-		Body* body = &dynamicBodies[i];
-		XMVECTOR position = XMLoadFloat3(&body->linVelocity) * dt + XMLoadFloat3(&body->position);
-		XMStoreFloat3(&body->position, position);
+		UpdateBody(&dynamicBodies[i], dt);
 	}
 
 

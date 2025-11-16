@@ -31,9 +31,29 @@ public:
 		KeyEvent(unsigned char code, Event type) noexcept
 			:
 			Code(code), Type(type)
+		{
+		}
+
+		KeyEvent(const KeyEvent& rhs) noexcept
+			:
+			Code(rhs.Code), Type(rhs.Type)
+		{
+		}
+		// Overloaded assignment operator
+		KeyEvent& operator=(const KeyEvent& c)
+		{
+			Code = c.Code;
+			Type = c.Type;
+		
+			return *this;
+		}
+		KeyEvent(KeyEvent&& rhs) noexcept
+			:
+			Code(rhs.Code), Type(rhs.Type)
 		{}
-		const unsigned char Code;
-		const Event Type;
+
+		unsigned char Code;
+		Event Type;
 	};
 
 	struct MouseEvent

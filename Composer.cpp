@@ -12,7 +12,8 @@ Composer::Composer(
     Renderer* renderer,
     PhysicsEnigne* physicsEngine)
     :
-    cameraAngleX(0), cameraAngleY(0), camOrientation(eyeInitial, upInitial, lookDirInitial), renderer(renderer) , physicsEngine(physicsEngine)
+    cameraAngleX(0), cameraAngleY(0), camOrientation(eyeInitial, upInitial, lookDirInitial), 
+    renderer(renderer) , physicsEngine(physicsEngine), calculatePhysics(false)
 {
     vector<GeometryEntry> boxGeo({ GeometryType::Box });
     renderer->CreateMeshCollection(boxGeo, &boxCollection);
@@ -102,7 +103,11 @@ void Composer::GenerateObjects()
 void Composer::UpdateObjects(
     float dt)
 {
-    //physicsEngine->UpdateBodies(dt);
+    if (calculatePhysics)
+    {
+        physicsEngine->UpdateBodies(dt);
+    }
+
     for (size_t i = 0; i < physicsEntitiesTrsfm.size(); i++)
     {
         physicsEngine->GetTransformMatrixForBody(physicsEntities[i], &physicsEntitiesTrsfm[i].transform);
@@ -122,6 +127,18 @@ void Composer::ProcessUserInput(
     XMVECTOR lookDirVec = XMLoadFloat3(&camOrientation.lookDir);
 
     XMVECTOR upInitialVec = XMLoadFloat3(&upInitial);
+
+
+    Window::KeyEvent event = window->ReadKeyEvent();
+    while (event.Type != Window::KeyEvent::Event::Invalid)
+    {
+        if (event.Code == 'T' && event.Type == Window::KeyEvent::Event::Press)
+        {
+            calculatePhysics = !calculatePhysics;
+        }
+        event = window->ReadKeyEvent();
+    }
+
 
     if (window->IsKeyPressed('W')) { eyeVec = XMVectorAdd(eyeVec, XMVectorScale(lookDirVec, dt * 10.0f)); }
     if (window->IsKeyPressed('S')) { eyeVec = XMVectorSubtract(eyeVec, XMVectorScale(lookDirVec, dt * 10.0f)); }

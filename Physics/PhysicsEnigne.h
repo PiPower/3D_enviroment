@@ -1,10 +1,11 @@
 #pragma once
 #include <vector>
 #include "Body.hpp"
+#include "Intersection.hpp"
 
 struct PhysicsEnigne
 {
-	PhysicsEnigne();
+	PhysicsEnigne(size_t expectedDynamicBodies = 200);
 
 	int64_t AddBody(
 		const BodyProperties& props,
@@ -21,15 +22,23 @@ struct PhysicsEnigne
 	int64_t UpdateBodies(float dt);
 
 private:
+
+	int64_t FindIntersections(
+		float dt);
+
 	Body* GetBody(
 		uint64_t bodyId);
 
-	Shape CreateDefaultShape(ShapeType type, DirectX::XMFLOAT3 scales);
+	Shape CreateDefaultShape(
+		ShapeType type,
+		DirectX::XMFLOAT3 scales);
+
 
 private:
 	std::vector<Body> staticBodies;
 	std::vector<DirectX::XMFLOAT3> constForces; // per dynamic body
 	std::vector<Body> dynamicBodies;
+	std::vector<Contact> contactPoints;
 
 };
 

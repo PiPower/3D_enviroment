@@ -1,3 +1,4 @@
+#pragma once
 #include <DirectXMath.h>
 #include "./Shapes/Shape.hpp"
 enum class ShapeType
@@ -5,8 +6,6 @@ enum class ShapeType
 	OrientedBox, // box constructed by combining scaled vectors [1,0,0],[0,1,0],[0,0,1]
 	Sphere
 };
-
-
 
 struct BodyProperties
 {
@@ -27,3 +26,7 @@ struct Body
 
 	Shape shape;
 };
+
+void UpdateBody(
+	Body* body,
+	float dt);
