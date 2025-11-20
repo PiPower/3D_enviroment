@@ -23,7 +23,9 @@ struct Box
 	XMFLOAT3 vertecies[VertexCount];
 };
 
-int64_t TransformationMatrix(char* shapeData, DirectX::XMFLOAT4X4* destMat)
+static int64_t TransformationMatrix(
+	char* shapeData,
+	DirectX::XMFLOAT4X4* destMat)
 {
 	Box* box = (Box*)shapeData;
 	XMMATRIX scaleMatrix = XMMatrixScaling(box->scales.x, box->scales.y, box->scales.z);
@@ -31,12 +33,41 @@ int64_t TransformationMatrix(char* shapeData, DirectX::XMFLOAT4X4* destMat)
 	return 0;
 }
 
+static void SupportFn(
+	Shape* shape,
+	const DirectX::XMFLOAT3* pos,
+	const DirectX::XMFLOAT3* dir, 
+	DirectX::XMFLOAT3* supportVec, 
+	float bias)
+{
+	Box* box = (Box*)shape->shapeData;
 
-Shape GetDefaultBoxShape(DirectX::XMFLOAT3 scales)
+	XMVECTOR dirVec = XMLoadFloat3(dir);
+	XMVECTOR posVec = XMLoadFloat3(pos);
+	XMVECTOR vert = XMLoadFloat3(&box->vertecies[0]) + posVec;
+	XMStoreFloat3(supportVec, vert);
+
+	float maxProd;
+	XMStoreFloat(&maxProd, XMVector3Dot(vert, dirVec));
+	for (uint8_t i = 1; i < 8; i++)
+	{
+		vert = XMLoadFloat3(&box->vertecies[i]) + posVec;
+		float prod;
+		XMStoreFloat(&prod, XMVector3Dot(vert, dirVec));
+		if (prod > maxProd)
+		{
+			maxProd = prod;
+			XMStoreFloat3(supportVec, vert);
+		}
+	}
+}
+Shape GetDefaultBoxShape(
+	DirectX::XMFLOAT3 scales)
 {
 	Shape boxShape;
 
 	boxShape.getTrasformationMatrix = TransformationMatrix;
+	boxShape.supportFunction = SupportFn;
 
 	Box* box = new Box();
 	box->scales = scales;

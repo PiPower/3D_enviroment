@@ -22,9 +22,22 @@ int64_t PhysicsEnigne::FindIntersections(float dt)
 	for (size_t i = 0; i < dynamicBodies.size(); i++)
 	{
 
-		for (size_t j = i + 1; i < dynamicBodies.size(); i++)
+		for (size_t j = i + 1; j < dynamicBodies.size(); j++)
 		{
 			if (CheckIntersection(&dynamicBodies[i], &dynamicBodies[j], &contactPoints[detectedIntersections], dt))
+			{
+				detectedIntersections++;
+				if (detectedIntersections >= contactPoints.size())
+				{
+					Contact fill = {};
+					contactPoints.resize(contactPoints.size() * 4, fill);
+				}
+			}
+		}
+
+		for (size_t j =0; j < staticBodies.size(); j++)
+		{
+			if (CheckIntersection(&dynamicBodies[i], &staticBodies[j], &contactPoints[detectedIntersections], dt))
 			{
 				detectedIntersections++;
 				if (detectedIntersections >= contactPoints.size())

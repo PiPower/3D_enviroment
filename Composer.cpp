@@ -13,7 +13,7 @@ Composer::Composer(
     PhysicsEnigne* physicsEngine)
     :
     cameraAngleX(0), cameraAngleY(0), camOrientation(eyeInitial, upInitial, lookDirInitial), 
-    renderer(renderer) , physicsEngine(physicsEngine), calculatePhysics(false)
+    renderer(renderer) , physicsEngine(physicsEngine), calculatePhysics(true)
 {
     vector<GeometryEntry> boxGeo({ GeometryType::Box });
     renderer->CreateMeshCollection(boxGeo, &boxCollection);
@@ -51,30 +51,31 @@ void Composer::GenerateObjects()
     std::random_device rd;  // Will be used to obtain a seed for the random number engine
     std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
     std::uniform_real_distribution<> dis(0, 1.0);
-    physicsEntities.resize(10 * 10 + 1);
-    physicsEntitiesTrsfm.resize(10 * 10 + 1);
-    for (int i = 0; i < 10; i++)
+    constexpr uint8_t boxCount = 1;
+    physicsEntities.resize(boxCount * boxCount + 1);
+    physicsEntitiesTrsfm.resize(boxCount * boxCount + 1);
+    for (int i = 0; i < boxCount; i++)
     {
-        for (int j = 0; j < 10; j++)
+        for (int j = 0; j < boxCount; j++)
         {
             uint64_t rectUbo;
             renderer->AllocateUboResource(uboPool, UBO_OBJ_TRSF_RESOURCE_TYPE, &rectUbo);
             renderEntities.push_back({ 0, 0, rectUbo, 0 });
 
             BodyProperties bodyProps;
-            bodyProps.position = { -10.0f + i * 2, 0, -10.0f + j * 2.0f };
+            bodyProps.position = { -(float)boxCount + i * 2, 0, -(float)boxCount + j * 2.0f };
             bodyProps.linVelocity = { 0, 0, 0 };
             bodyProps.angVelocity = { 0, 0, 0 };
             bodyProps.massInv = 1.0f / 10.0f;
             bodyProps.rotation = { 0, 0, 0 };
             
-            physicsEngine->AddBody(bodyProps, ShapeType::OrientedBox, { 1.0f, 1.0f, 1.0f }, true, &physicsEntities[i * 10 + j]);
-            physicsEngine->GetTransformMatrixForBody(physicsEntities[i * 10 + j], &physicsEntitiesTrsfm[i * 10 + j].transform);
+            physicsEngine->AddBody(bodyProps, ShapeType::OrientedBox, { 1.0f, 1.0f, 1.0f }, true, &physicsEntities[i * boxCount + j]);
+            physicsEngine->GetTransformMatrixForBody(physicsEntities[i * boxCount + j], &physicsEntitiesTrsfm[i * boxCount + j].transform);
 
-            physicsEntitiesTrsfm[i * 10 + j].color[0] = dis(gen);
-            physicsEntitiesTrsfm[i * 10 + j].color[1] = dis(gen);
-            physicsEntitiesTrsfm[i * 10 + j].color[2] = dis(gen);
-            physicsEntitiesTrsfm[i * 10 + j].color[3] = 1.0f;
+            physicsEntitiesTrsfm[i * boxCount + j].color[0] = dis(gen);
+            physicsEntitiesTrsfm[i * boxCount + j].color[1] = dis(gen);
+            physicsEntitiesTrsfm[i * boxCount + j].color[2] = dis(gen);
+            physicsEntitiesTrsfm[i * boxCount + j].color[3] = 1.0f;
 
         }
     }
@@ -90,13 +91,13 @@ void Composer::GenerateObjects()
     bodyProps.massInv = 1.0f / 10.0f;
     bodyProps.rotation = { 0, 0, 0 };
  
-    physicsEngine->AddBody(bodyProps, ShapeType::OrientedBox, { 20.0f, 1.0f, 20.0f }, false, &physicsEntities[10 * 10]);
-    physicsEngine->GetTransformMatrixForBody(physicsEntities[10 * 10], &physicsEntitiesTrsfm[10 * 10].transform);
+    physicsEngine->AddBody(bodyProps, ShapeType::OrientedBox, { 20.0f, 1.0f, 20.0f }, false, &physicsEntities[boxCount * boxCount]);
+    physicsEngine->GetTransformMatrixForBody(physicsEntities[boxCount * boxCount], &physicsEntitiesTrsfm[boxCount * boxCount].transform);
 
-    physicsEntitiesTrsfm[10 * 10].color[0] = dis(gen);
-    physicsEntitiesTrsfm[10 * 10].color[1] = dis(gen);
-    physicsEntitiesTrsfm[10 * 10].color[2] = dis(gen);
-    physicsEntitiesTrsfm[10 * 10].color[3] = 1.0f;
+    physicsEntitiesTrsfm[boxCount * boxCount].color[0] = dis(gen);
+    physicsEntitiesTrsfm[boxCount * boxCount].color[1] = dis(gen);
+    physicsEntitiesTrsfm[boxCount * boxCount].color[2] = dis(gen);
+    physicsEntitiesTrsfm[boxCount * boxCount].color[3] = 1.0f;
 
 }
 
