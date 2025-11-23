@@ -9,4 +9,8 @@ struct Contact
 	float timeOfImpact;
 };
 
-bool CheckIntersection(Body* bodyA, Body* bodyB, Contact* contact, float dt);
+bool CheckIntersection(
+	Body* bodyA,
+	Body* bodyB,
+	Contact* contact,
+	float dt);
