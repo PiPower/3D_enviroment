@@ -18,7 +18,7 @@ PhysicsEnigne::PhysicsEnigne(
 
 int64_t PhysicsEnigne::FindIntersections(float dt)
 {
-	size_t detectedIntersections = 0;
+	detectedIntersections = 0;
 	for (size_t i = 0; i < dynamicBodies.size(); i++)
 	{
 
@@ -139,6 +139,15 @@ int64_t PhysicsEnigne::UpdateBodies(float dt)
 	}
 
 	FindIntersections(dt);
+
+
+	for (size_t i = 0; i < detectedIntersections; i++)
+	{
+		Contact& contact = contactPoints[i];
+		contact.bodyA->linVelocity = { 0 ,0 ,0 };
+		contact.bodyB->linVelocity = { 0 ,0 ,0 };
+
+	}
 
 	for (size_t i = 0; i < dynamicBodies.size(); i++)
 	{

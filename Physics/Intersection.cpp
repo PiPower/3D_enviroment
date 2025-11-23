@@ -194,8 +194,8 @@ static void SignedDistance3D(
 
 			lambdas[0] = edgeLambdas[0];
 			lambdas[1] = edgeLambdas[1];
-			lambdas[3] = edgeLambdas[2];
-			lambdas[4] = 0.0f;
+			lambdas[2] = edgeLambdas[2];
+			lambdas[3] = 0.0f;
 
 			simplex[0] = simplexEdge[0];
 			simplex[1] = simplexEdge[1];
@@ -304,19 +304,21 @@ static bool GjkIntersectionTest(
 	Contact* contact,
 	float bias)
 {
+	constexpr float epsilon = 0.0001;
+	constexpr uint8_t maxIters = 10;
+
 	XMFLOAT3 simplex[4];
 	uint8_t idxCount = 1;
 	XMFLOAT3 dir = { 0, 1, 0 };
 	float lambdas[4] = {};
 	XMFLOAT3 support;
-	constexpr float epsilon = 0.001;
-
+	uint8_t iterCount = 0;
 	GetSupport(bodyA, bodyB, &dir, &simplex[0], bias);
 	XMVECTOR vecDir = XMLoadFloat3(&simplex[0]) * -1.0f;
 	XMStoreFloat3(&dir, vecDir);
 	bool hasOrigin = false;
 	float closestDistSq = simplex[0].x * simplex[0].x + simplex[0].y * simplex[0].y + simplex[0].z * simplex[0].z;
-	while (!hasOrigin)
+	while (!hasOrigin && iterCount < maxIters)
 	{
 		vecDir = XMLoadFloat3(&dir);
 		GetSupport(bodyA, bodyB, &dir, &support, bias);
@@ -350,6 +352,7 @@ static bool GjkIntersectionTest(
 
 		closestDistSq = newDistSq;
 		hasOrigin = idxCount == 4;
+		iterCount++;
 	}
 
 	return hasOrigin;
@@ -372,6 +375,9 @@ bool CheckIntersection(
 			contact->timeOfImpact = total_time;
 			contact->bodyA = bodyA;
 			contact->bodyB = bodyB;
+
+			UpdateBody(bodyA, -total_time);
+			UpdateBody(bodyB, -total_time);
 			return true;
 		}
 

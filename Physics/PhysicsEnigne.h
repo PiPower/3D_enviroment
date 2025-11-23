@@ -39,6 +39,6 @@ private:
 	std::vector<DirectX::XMFLOAT3> constForces; // per dynamic body
 	std::vector<Body> dynamicBodies;
 	std::vector<Contact> contactPoints;
-
+	size_t detectedIntersections;
 };
 

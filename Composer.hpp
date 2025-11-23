@@ -40,6 +40,7 @@ public:
 	uint64_t boxCollection;
 	uint64_t uboPool;
 	bool calculatePhysics;
+	bool frameMode;
 	// ----- Entity related -----
 	std::vector<uint64_t> physicsEntities;
 	std::vector<ObjectUbo> physicsEntitiesTrsfm;

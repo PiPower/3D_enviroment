@@ -4,7 +4,7 @@
 using namespace DirectX;
 using namespace std;
 
-static constexpr XMFLOAT3 eyeInitial = { 0.0f, 1.0f, 0.0f };
+static constexpr XMFLOAT3 eyeInitial = { -1.0f, 4.0f, -5.0f };
 static constexpr XMFLOAT3 lookDirInitial = { 0.0f, 0.0f, 1.0f };
 static constexpr XMFLOAT3 upInitial = { 0.0f, 1.0f, 0.0f };
 
@@ -13,7 +13,7 @@ Composer::Composer(
     PhysicsEnigne* physicsEngine)
     :
     cameraAngleX(0), cameraAngleY(0), camOrientation(eyeInitial, upInitial, lookDirInitial), 
-    renderer(renderer) , physicsEngine(physicsEngine), calculatePhysics(true)
+    renderer(renderer) , physicsEngine(physicsEngine), calculatePhysics(true), frameMode(true)
 {
     vector<GeometryEntry> boxGeo({ GeometryType::Box });
     renderer->CreateMeshCollection(boxGeo, &boxCollection);
@@ -51,7 +51,7 @@ void Composer::GenerateObjects()
     std::random_device rd;  // Will be used to obtain a seed for the random number engine
     std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
     std::uniform_real_distribution<> dis(0, 1.0);
-    constexpr uint8_t boxCount = 1;
+    constexpr uint8_t boxCount = 5;
     physicsEntities.resize(boxCount * boxCount + 1);
     physicsEntitiesTrsfm.resize(boxCount * boxCount + 1);
     for (int i = 0; i < boxCount; i++)
@@ -63,7 +63,7 @@ void Composer::GenerateObjects()
             renderEntities.push_back({ 0, 0, rectUbo, 0 });
 
             BodyProperties bodyProps;
-            bodyProps.position = { -(float)boxCount + i * 2, 0, -(float)boxCount + j * 2.0f };
+            bodyProps.position = { -(float)boxCount * 2 + i * 4, 3, -(float)boxCount * 2 + j * 4.0f };
             bodyProps.linVelocity = { 0, 0, 0 };
             bodyProps.angVelocity = { 0, 0, 0 };
             bodyProps.massInv = 1.0f / 10.0f;
@@ -91,7 +91,7 @@ void Composer::GenerateObjects()
     bodyProps.massInv = 1.0f / 10.0f;
     bodyProps.rotation = { 0, 0, 0 };
  
-    physicsEngine->AddBody(bodyProps, ShapeType::OrientedBox, { 20.0f, 1.0f, 20.0f }, false, &physicsEntities[boxCount * boxCount]);
+    physicsEngine->AddBody(bodyProps, ShapeType::OrientedBox, { 23.3, 2.2, 20.34 }, false, &physicsEntities[boxCount * boxCount]);
     physicsEngine->GetTransformMatrixForBody(physicsEntities[boxCount * boxCount], &physicsEntitiesTrsfm[boxCount * boxCount].transform);
 
     physicsEntitiesTrsfm[boxCount * boxCount].color[0] = dis(gen);
@@ -107,6 +107,11 @@ void Composer::UpdateObjects(
     if (calculatePhysics)
     {
         physicsEngine->UpdateBodies(dt);
+        if (frameMode)
+        {
+            calculatePhysics = false;
+        }
+        
     }
 
     for (size_t i = 0; i < physicsEntitiesTrsfm.size(); i++)
@@ -137,6 +142,10 @@ void Composer::ProcessUserInput(
         {
             calculatePhysics = !calculatePhysics;
         }
+        else if (event.Code == 'Y' && event.Type == Window::KeyEvent::Event::Press)
+        {
+            frameMode = !frameMode;
+        }
         event = window->ReadKeyEvent();
     }
 
@@ -152,20 +161,20 @@ void Composer::ProcessUserInput(
         static float angleX = 0.0f, angleY = 0.0f;
         if (window->GetMouseDeltaX() < 0)
         {
-            angleY += dt * 10.0f;
+            angleY += dt * 5.0f;
         }
         else if (window->GetMouseDeltaX() > 0)
         {
-            angleY += -dt * 10.0f;
+            angleY += -dt * 5.0f;
         }
 
         if (window->GetMouseDeltaY() < 0)
         {
-            angleX += -dt * 10.0f;
+            angleX += -dt * 5.0f;
         }
         else if (window->GetMouseDeltaY() > 0)
         {
-            angleX += dt * 10.0f;
+            angleX += dt * 5.0f;
         }
 
         /*

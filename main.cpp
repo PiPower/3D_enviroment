@@ -2,7 +2,7 @@
 #include "Renderer/Renderer.hpp"
 #include "Composer.hpp"
 #include "Physics/PhysicsEnigne.h"
-
+#include <string>
 using namespace std;
 
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
@@ -24,7 +24,6 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
         auto t2 = chrono::high_resolution_clock::now();
         chrono::duration duration = t2 - t1;
         dt = (float)duration.count() / 1'000'000'000.0f;
-
     }
 
 }
