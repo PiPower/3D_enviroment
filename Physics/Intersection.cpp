@@ -3,7 +3,7 @@
 
 using namespace DirectX;
 
-static bool inline compareSigns(
+static bool inline CompareSigns(
 	float a,
 	float b)
 {
@@ -37,7 +37,7 @@ static void SignedDistance1D(
 	float C2 = XMVectorGetByIndex(s1 - p0, mu_idx);
 
 	// if p is between [s1, s2]
-	if (compareSigns(mu_max, C1) && compareSigns(mu_max, C2)) {
+	if (CompareSigns(mu_max, C1) && CompareSigns(mu_max, C2)) {
 		lambdas[0] = C1 / mu_max;
 		lambdas[1] = C2 / mu_max;
 	}
@@ -83,8 +83,8 @@ static void SignedDistance2D(
 	uint8_t y = (idx + 2) % 3;
 	float diffSP[9];
 	XMStoreFloat3((XMFLOAT3*)diffSP, s1 - p0);
-	XMStoreFloat3((XMFLOAT3*)diffSP + 3, s2 - p0);
-	XMStoreFloat3((XMFLOAT3*)diffSP + 6, s3 - p0);
+	XMStoreFloat3((XMFLOAT3*)(diffSP + 3), s2 - p0);
+	XMStoreFloat3((XMFLOAT3*)(diffSP + 6), s3 - p0);
 
 	float C[3];
 	for (uint8_t i = 0; i < 3; i++)
@@ -95,7 +95,7 @@ static void SignedDistance2D(
 		C[i] = diffSP[k * 3 + x] * diffSP[l * 3 + y] - diffSP[k * 3 + y] * diffSP[l * 3 + x];
 	}
 
-	if (compareSigns(mu_max, C[0]) && compareSigns(mu_max, C[1]) && compareSigns(mu_max, C[2]))
+	if (CompareSigns(mu_max, C[0]) && CompareSigns(mu_max, C[1]) && CompareSigns(mu_max, C[2]))
 	{
 		lambdas[0] = C[0] / mu_max;
 		lambdas[1] = C[1] / mu_max;
@@ -103,9 +103,38 @@ static void SignedDistance2D(
 		return;
 	}
 
+	float dist = 1000000000.0f;
 	for (uint8_t i = 0; i < 3; i++)
 	{
+		if (!CompareSigns(mu_max, -C[i]))
+		{
+			continue;
+		}
 
+		uint8_t k = (i + 1) % 3;
+		uint8_t l = (i + 2) % 3;
+		XMFLOAT3 simplexEdge[2];
+		float edgeLambdas[2];
+		simplexEdge[0] = simplex[k];
+		simplexEdge[1] = simplex[l];
+
+		SignedDistance1D(simplexEdge, edgeLambdas);
+		XMVECTOR v = XMVectorZero();
+
+		v += edgeLambdas[0] * XMLoadFloat3(&simplexEdge[0]);
+		v += edgeLambdas[1] * XMLoadFloat3(&simplexEdge[1]);
+
+		float distSq;
+		XMStoreFloat(&distSq, XMVector3LengthSq(v));
+		if (distSq < dist)
+		{
+			lambdas[0] = edgeLambdas[0];
+			lambdas[1] = edgeLambdas[1];
+			lambdas[2] = 0.0f;
+
+			simplex[0] = simplexEdge[0];
+			simplex[1] = simplexEdge[1];
+		}
 	}
 }
 
@@ -133,16 +162,23 @@ static void DistanceSubalgorithm(
 	{
 	case 2:
 		SignedDistance1D(simplex, lambdas);
-		for (uint8_t i = 0; i < 2; i++)
-		{
-			v += lambdas[i] * XMLoadFloat3(&simplex[i]);
-		}
+		v += lambdas[0] * XMLoadFloat3(&simplex[0]);
+		v += lambdas[1] * XMLoadFloat3(&simplex[1]);
 		v = v * -1.0f;
+
 		XMStoreFloat3(newDir, v);
 		*idxCount = lambdas[1] == 0.0f ? 1 : 2;
 		break;
 	case 3:
 		SignedDistance2D(simplex, lambdas);
+		v += lambdas[0] * XMLoadFloat3(&simplex[0]);
+		v += lambdas[1] * XMLoadFloat3(&simplex[1]);
+		v += lambdas[2] * XMLoadFloat3(&simplex[2]);
+		v = v * -1.0f;
+
+		XMStoreFloat3(newDir, v);
+		*idxCount = lambdas[2] == 0.0f ? 2 : 3;
+		*idxCount = (*idxCount == 2 && lambdas[1] == 0.0f) ? 1 : 2;
 		break;
 	case 4: 
 		SignedDistance3D(simplex, lambdas);
@@ -211,7 +247,7 @@ static bool GjkIntersectionTest(
 	float closestDistSq = simplex[0].x * simplex[0].x + simplex[0].y * simplex[0].y + simplex[0].z * simplex[0].z;
 	while (!hasOrigin)
 	{
-
+		vecDir = XMLoadFloat3(&dir);
 		GetSupport(bodyA, bodyB, &dir, &support, bias);
 		if (HasPoint(simplex, &support, idxCount))
 		{
@@ -240,8 +276,8 @@ static bool GjkIntersectionTest(
 		{
 			break;
 		}
-		closestDistSq = newDistSq;
 
+		closestDistSq = newDistSq;
 		hasOrigin = idxCount == 4;
 	}
 
