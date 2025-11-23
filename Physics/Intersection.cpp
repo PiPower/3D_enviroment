@@ -53,6 +53,7 @@ static void SignedDistance2D(
 	XMFLOAT3* simplex,
 	float* lambdas)
 {
+
 	XMVECTOR s1 = XMLoadFloat3(&simplex[0]);
 	XMVECTOR s2 = XMLoadFloat3(&simplex[1]);
 	XMVECTOR s3 = XMLoadFloat3(&simplex[2]);
@@ -106,10 +107,6 @@ static void SignedDistance2D(
 	float dist = 1000000000.0f;
 	for (uint8_t i = 0; i < 3; i++)
 	{
-		if (!CompareSigns(mu_max, -C[i]))
-		{
-			continue;
-		}
 
 		uint8_t k = (i + 1) % 3;
 		uint8_t l = (i + 2) % 3;
@@ -128,6 +125,8 @@ static void SignedDistance2D(
 		XMStoreFloat(&distSq, XMVector3LengthSq(v));
 		if (distSq < dist)
 		{
+			dist = distSq;
+
 			lambdas[0] = edgeLambdas[0];
 			lambdas[1] = edgeLambdas[1];
 			lambdas[2] = 0.0f;
@@ -142,6 +141,67 @@ static void SignedDistance3D(
 	XMFLOAT3* simplex,
 	float* lambdas)
 {
+	XMVECTOR column4 = XMVectorSet(0, 0, 0, 1.0f);
+	float C[4];
+	float determinant = 0;
+	int minorColumns[4][3] = { {1, 2, 3}, {0, 2, 3}, {0 , 1, 3}, {0, 1, 2} };
+	for (uint8_t i = 0; i < 4; i++)
+	{
+		XMVECTOR column1 = XMLoadFloat3(&simplex[minorColumns[i][0]]);
+		XMVECTOR column2 = XMLoadFloat3(&simplex[minorColumns[i][1]]);
+		XMVECTOR column3 = XMLoadFloat3(&simplex[minorColumns[i][2]]);
+
+		XMMATRIX mat = XMMatrixTranspose( XMMATRIX(column1, column2, column3, column4) );
+		XMStoreFloat(&C[i], XMMatrixDeterminant(mat));
+		C[i] *= (4 + i) % 2 == 0 ? 1 : -1;
+		determinant += C[i];
+	}
+
+	if (CompareSigns(determinant, C[0]) && CompareSigns(determinant, C[1])
+		&& CompareSigns(determinant, C[2]) && CompareSigns(determinant, C[3]))
+	{
+		lambdas[0] = C[0] / determinant;
+		lambdas[1] = C[1] / determinant;
+		lambdas[2] = C[2] / determinant;
+		lambdas[3] = C[3] / determinant;
+		return;
+	}
+
+
+	float dist = 1000000000.0f;
+	for (uint8_t i = 0; i < 4; i++)
+	{
+		uint8_t k = (i + 1) % 4;
+		uint8_t l = (i + 2) % 4;
+		XMFLOAT3 simplexEdge[3];
+		float edgeLambdas[3];
+		simplexEdge[0] = simplex[i];
+		simplexEdge[1] = simplex[k];
+		simplexEdge[2] = simplex[l];
+
+		SignedDistance2D(simplexEdge, edgeLambdas);
+		XMVECTOR v = XMVectorZero();
+
+		v += edgeLambdas[0] * XMLoadFloat3(&simplexEdge[0]);
+		v += edgeLambdas[1] * XMLoadFloat3(&simplexEdge[1]);
+		v += edgeLambdas[2] * XMLoadFloat3(&simplexEdge[2]);
+
+		float distSq;
+		XMStoreFloat(&distSq, XMVector3LengthSq(v));
+		if (distSq < dist)
+		{
+			dist = distSq;
+
+			lambdas[0] = edgeLambdas[0];
+			lambdas[1] = edgeLambdas[1];
+			lambdas[3] = edgeLambdas[2];
+			lambdas[4] = 0.0f;
+
+			simplex[0] = simplexEdge[0];
+			simplex[1] = simplexEdge[1];
+			simplex[2] = simplexEdge[2];
+		}
+	}
 
 }
 /*
@@ -178,10 +238,21 @@ static void DistanceSubalgorithm(
 
 		XMStoreFloat3(newDir, v);
 		*idxCount = lambdas[2] == 0.0f ? 2 : 3;
-		*idxCount = (*idxCount == 2 && lambdas[1] == 0.0f) ? 1 : 2;
+		if (*idxCount == 2) { *idxCount = lambdas[1] == 0.0f ? 1 : 2; }
 		break;
 	case 4: 
 		SignedDistance3D(simplex, lambdas);
+		v += lambdas[0] * XMLoadFloat3(&simplex[0]);
+		v += lambdas[1] * XMLoadFloat3(&simplex[1]);
+		v += lambdas[2] * XMLoadFloat3(&simplex[2]);
+		v += lambdas[3] * XMLoadFloat3(&simplex[3]);
+		v = v * -1.0f;
+
+		XMStoreFloat3(newDir, v);
+		*idxCount = lambdas[3] == 0.0f ? 3 : 4;
+		*idxCount = lambdas[2] == 0.0f ? 2 : 3;
+		*idxCount = (*idxCount == 2 && lambdas[1] == 0.0f) ? 1 : 2;
+
 		break;
 	default:
 		exit(-1);
@@ -299,6 +370,8 @@ bool CheckIntersection(
 		if (GjkIntersectionTest(bodyA, bodyB, contact, 0.001))
 		{
 			contact->timeOfImpact = total_time;
+			contact->bodyA = bodyA;
+			contact->bodyB = bodyB;
 			return true;
 		}
 
