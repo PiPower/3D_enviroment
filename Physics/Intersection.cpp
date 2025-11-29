@@ -10,6 +10,29 @@ static bool inline CompareSigns(
 	return (a > 0 && b > 0) || (b < 0 && a < 0);
 }
 
+inline void GetOrtho(XMFLOAT3* n, XMFLOAT3* u, XMFLOAT3* v) 
+{
+	XMVECTOR nVec = XMLoadFloat3(n);
+	nVec = XMVector3Normalize(nVec);
+
+	XMVECTOR uVec, vVec;
+	XMFLOAT3 imm;
+	XMStoreFloat3(&imm, nVec * nVec);
+	XMVECTOR wVec = (imm.z > 0.9f * 0.9f) ? XMVectorSet(1, 0, 0 ,0) : XMVectorSet(0, 1, 0, 0);
+	uVec = XMVector3Cross(wVec, nVec);
+	uVec = XMVector3Normalize(uVec);
+
+
+	vVec = XMVector3Cross(nVec, uVec);
+	vVec = XMVector3Normalize(vVec);
+	uVec = XMVector3Cross(vVec, nVec);
+	uVec = XMVector3Normalize(uVec);
+
+	XMStoreFloat3(u, uVec);
+	XMStoreFloat3(v, vVec);
+}
+
+
 static void SignedDistance1D(
 	XMFLOAT3* simplex, 
 	float* lambdas)
@@ -355,6 +378,33 @@ static bool GjkIntersectionTest(
 		iterCount++;
 	}
 
+	// if simplex is not Tetrahedron build it
+	if (idxCount == 1)
+	{
+		XMFLOAT3 searchDir;
+		XMStoreFloat3(&searchDir, XMLoadFloat3(&simplex[0]) * -1.0f);
+		GetSupport(bodyA, bodyB, &searchDir, &simplex[idxCount], bias);
+		idxCount++;
+	}
+	if (idxCount == 2)
+	{
+		XMFLOAT3 n = {simplex[1].x - simplex[0].x, simplex[1].y - simplex[0].y, simplex[1].z - simplex[0].z };
+		XMFLOAT3 u, v;
+		GetOrtho(&n, &u, &v);
+
+		GetSupport(bodyA, bodyB, &u, &simplex[idxCount], bias);
+		idxCount++;
+	}
+	if (idxCount == 3)
+	{
+		XMVECTOR ab = XMLoadFloat3(&simplex[1]) - XMLoadFloat3(&simplex[0]);
+		XMVECTOR ac = XMLoadFloat3(&simplex[2]) - XMLoadFloat3(&simplex[0]);
+		XMFLOAT3 newDir;
+		XMStoreFloat3(&newDir, XMVector3Cross(ab, ac));
+
+		GetSupport(bodyA, bodyB, &newDir, &simplex[idxCount], bias);
+		idxCount++;
+	}
 	return hasOrigin;
 }
 
