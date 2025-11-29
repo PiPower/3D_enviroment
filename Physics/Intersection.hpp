@@ -4,9 +4,11 @@
 struct Contact
 {
 	DirectX::XMFLOAT3 normal;
+	DirectX::XMFLOAT3 ptOnA;
+	DirectX::XMFLOAT3 ptOnB;
+	float timeOfImpact;
 	Body* bodyA;
 	Body* bodyB;
-	float timeOfImpact;
 };
 
 bool CheckIntersection(

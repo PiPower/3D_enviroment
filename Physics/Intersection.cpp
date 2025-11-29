@@ -3,6 +3,38 @@
 
 using namespace DirectX;
 
+struct SupportPoint
+{
+	XMFLOAT3 ptOnSimplex;
+	XMFLOAT3 ptOnA;
+	XMFLOAT3 ptOnB;
+};
+
+struct Simplex
+{
+	XMFLOAT3 ptOnSimplex[4];
+	uint8_t idxCount;
+	XMFLOAT3 ptOnA[4];
+	XMFLOAT3 ptOnB[4];
+
+	Simplex() : idxCount(0) {}
+
+	void AddSupport(const SupportPoint* supp)
+	{
+		ptOnSimplex[idxCount] = supp->ptOnSimplex;
+		ptOnA[idxCount] = supp->ptOnA;
+		ptOnB[idxCount] = supp->ptOnB;
+		idxCount++;
+	}
+	void AddSupport(const Simplex* simplex, const uint8_t idx)
+	{
+		ptOnSimplex[idxCount] = simplex->ptOnSimplex[idx];
+		ptOnA[idxCount] = simplex->ptOnA[idx];
+		ptOnB[idxCount] = simplex->ptOnB[idx];
+		idxCount++;
+	}
+};
+
 static bool inline CompareSigns(
 	float a,
 	float b)
@@ -10,7 +42,18 @@ static bool inline CompareSigns(
 	return (a > 0 && b > 0) || (b < 0 && a < 0);
 }
 
-inline void GetOrtho(XMFLOAT3* n, XMFLOAT3* u, XMFLOAT3* v) 
+static float EpaContactInfo(
+	const Body* bodyA, 
+	const Body* bodyB,
+	const float bias, 
+	const Simplex simplexPoints[4],
+	XMFLOAT3* ptOnA,
+	XMFLOAT3* ptOnB)
+{
+	return 0.0f;
+}
+
+static inline void GetOrtho(XMFLOAT3* n, XMFLOAT3* u, XMFLOAT3* v)
 {
 	XMVECTOR nVec = XMLoadFloat3(n);
 	nVec = XMVector3Normalize(nVec);
@@ -34,11 +77,11 @@ inline void GetOrtho(XMFLOAT3* n, XMFLOAT3* u, XMFLOAT3* v)
 
 
 static void SignedDistance1D(
-	XMFLOAT3* simplex, 
+	Simplex* simplex, 
 	float* lambdas)
 {
-	XMVECTOR s1 = XMLoadFloat3(&simplex[0]);
-	XMVECTOR s2 = XMLoadFloat3(&simplex[1]);
+	XMVECTOR s1 = XMLoadFloat3(&simplex->ptOnSimplex[0]);
+	XMVECTOR s2 = XMLoadFloat3(&simplex->ptOnSimplex[1]);
 	XMVECTOR o = XMVectorZero();
 	XMVECTOR v = s2 - s1;
 
@@ -73,13 +116,13 @@ static void SignedDistance1D(
 }
 
 static void SignedDistance2D(
-	XMFLOAT3* simplex,
+	Simplex* simplex,
 	float* lambdas)
 {
 
-	XMVECTOR s1 = XMLoadFloat3(&simplex[0]);
-	XMVECTOR s2 = XMLoadFloat3(&simplex[1]);
-	XMVECTOR s3 = XMLoadFloat3(&simplex[2]);
+	XMVECTOR s1 = XMLoadFloat3(&simplex->ptOnSimplex[0]);
+	XMVECTOR s2 = XMLoadFloat3(&simplex->ptOnSimplex[1]);
+	XMVECTOR s3 = XMLoadFloat3(&simplex->ptOnSimplex[2]);
 
 	XMVECTOR n = XMVector3Cross(s2 - s1, s3 - s1);
 	XMVECTOR p0 = (XMVector3Dot(s1, n) * n) / XMVector3LengthSq(n);
@@ -128,21 +171,22 @@ static void SignedDistance2D(
 	}
 
 	float dist = 1000000000.0f;
+	Simplex simplexBuffer;
 	for (uint8_t i = 0; i < 3; i++)
 	{
 
 		uint8_t k = (i + 1) % 3;
 		uint8_t l = (i + 2) % 3;
-		XMFLOAT3 simplexEdge[2];
+		Simplex simplexLocal;
 		float edgeLambdas[2];
-		simplexEdge[0] = simplex[k];
-		simplexEdge[1] = simplex[l];
+		simplexLocal.AddSupport(simplex, k);
+		simplexLocal.AddSupport(simplex, l);
 
-		SignedDistance1D(simplexEdge, edgeLambdas);
+		SignedDistance1D(&simplexLocal, edgeLambdas);
 		XMVECTOR v = XMVectorZero();
 
-		v += edgeLambdas[0] * XMLoadFloat3(&simplexEdge[0]);
-		v += edgeLambdas[1] * XMLoadFloat3(&simplexEdge[1]);
+		v += edgeLambdas[0] * XMLoadFloat3(&simplexLocal.ptOnSimplex[0]);
+		v += edgeLambdas[1] * XMLoadFloat3(&simplexLocal.ptOnSimplex[1]);
 
 		float distSq;
 		XMStoreFloat(&distSq, XMVector3LengthSq(v));
@@ -154,14 +198,14 @@ static void SignedDistance2D(
 			lambdas[1] = edgeLambdas[1];
 			lambdas[2] = 0.0f;
 
-			simplex[0] = simplexEdge[0];
-			simplex[1] = simplexEdge[1];
+			simplexBuffer = simplexLocal;
 		}
 	}
+	*simplex = simplexBuffer;
 }
 
 static void SignedDistance3D(
-	XMFLOAT3* simplex,
+	Simplex* simplex,
 	float* lambdas)
 {
 	XMVECTOR column4 = XMVectorSet(0, 0, 0, 1.0f);
@@ -170,9 +214,9 @@ static void SignedDistance3D(
 	int minorColumns[4][3] = { {1, 2, 3}, {0, 2, 3}, {0 , 1, 3}, {0, 1, 2} };
 	for (uint8_t i = 0; i < 4; i++)
 	{
-		XMVECTOR column1 = XMLoadFloat3(&simplex[minorColumns[i][0]]);
-		XMVECTOR column2 = XMLoadFloat3(&simplex[minorColumns[i][1]]);
-		XMVECTOR column3 = XMLoadFloat3(&simplex[minorColumns[i][2]]);
+		XMVECTOR column1 = XMLoadFloat3(&simplex->ptOnSimplex[minorColumns[i][0]]);
+		XMVECTOR column2 = XMLoadFloat3(&simplex->ptOnSimplex[minorColumns[i][1]]);
+		XMVECTOR column3 = XMLoadFloat3(&simplex->ptOnSimplex[minorColumns[i][2]]);
 
 		XMMATRIX mat = XMMatrixTranspose( XMMATRIX(column1, column2, column3, column4) );
 		XMStoreFloat(&C[i], XMMatrixDeterminant(mat));
@@ -192,22 +236,23 @@ static void SignedDistance3D(
 
 
 	float dist = 1000000000.0f;
+	Simplex simplexBuffer;
 	for (uint8_t i = 0; i < 4; i++)
 	{
 		uint8_t k = (i + 1) % 4;
 		uint8_t l = (i + 2) % 4;
-		XMFLOAT3 simplexEdge[3];
+		Simplex localSimplex;
 		float edgeLambdas[3];
-		simplexEdge[0] = simplex[i];
-		simplexEdge[1] = simplex[k];
-		simplexEdge[2] = simplex[l];
+		localSimplex.AddSupport(simplex, i);
+		localSimplex.AddSupport(simplex, k);
+		localSimplex.AddSupport(simplex, l);
 
-		SignedDistance2D(simplexEdge, edgeLambdas);
+		SignedDistance2D(&localSimplex, edgeLambdas);
 		XMVECTOR v = XMVectorZero();
 
-		v += edgeLambdas[0] * XMLoadFloat3(&simplexEdge[0]);
-		v += edgeLambdas[1] * XMLoadFloat3(&simplexEdge[1]);
-		v += edgeLambdas[2] * XMLoadFloat3(&simplexEdge[2]);
+		v += edgeLambdas[0] * XMLoadFloat3(&localSimplex.ptOnSimplex[0]);
+		v += edgeLambdas[1] * XMLoadFloat3(&localSimplex.ptOnSimplex[1]);
+		v += edgeLambdas[2] * XMLoadFloat3(&localSimplex.ptOnSimplex[2]);
 
 		float distSq;
 		XMStoreFloat(&distSq, XMVector3LengthSq(v));
@@ -220,11 +265,10 @@ static void SignedDistance3D(
 			lambdas[2] = edgeLambdas[2];
 			lambdas[3] = 0.0f;
 
-			simplex[0] = simplexEdge[0];
-			simplex[1] = simplexEdge[1];
-			simplex[2] = simplexEdge[2];
+			simplexBuffer = localSimplex;
 		}
 	}
+	*simplex = simplexBuffer;
 
 }
 /*
@@ -234,48 +278,46 @@ static void SignedDistance3D(
 		newDir to new direction  
 */
 static void DistanceSubalgorithm(
-	XMFLOAT3* simplex,
-	uint8_t* idxCount,
+	Simplex* simplex,
 	float* lambdas,
 	XMFLOAT3* newDir)
 {
 	XMVECTOR v = XMVectorZero();
 
-	switch (*idxCount)
+	switch (simplex->idxCount)
 	{
 	case 2:
 		SignedDistance1D(simplex, lambdas);
-		v += lambdas[0] * XMLoadFloat3(&simplex[0]);
-		v += lambdas[1] * XMLoadFloat3(&simplex[1]);
+		v += lambdas[0] * XMLoadFloat3(&simplex->ptOnSimplex[0]);
+		v += lambdas[1] * XMLoadFloat3(&simplex->ptOnSimplex[1]);
 		v = v * -1.0f;
 
 		XMStoreFloat3(newDir, v);
-		*idxCount = lambdas[1] == 0.0f ? 1 : 2;
+		simplex->idxCount = lambdas[1] == 0.0f ? 1 : 2;
 		break;
 	case 3:
 		SignedDistance2D(simplex, lambdas);
-		v += lambdas[0] * XMLoadFloat3(&simplex[0]);
-		v += lambdas[1] * XMLoadFloat3(&simplex[1]);
-		v += lambdas[2] * XMLoadFloat3(&simplex[2]);
+		v += lambdas[0] * XMLoadFloat3(&simplex->ptOnSimplex[0]);
+		v += lambdas[1] * XMLoadFloat3(&simplex->ptOnSimplex[1]);
+		v += lambdas[2] * XMLoadFloat3(&simplex->ptOnSimplex[2]);
 		v = v * -1.0f;
 
 		XMStoreFloat3(newDir, v);
-		*idxCount = lambdas[2] == 0.0f ? 2 : 3;
-		if (*idxCount == 2) { *idxCount = lambdas[1] == 0.0f ? 1 : 2; }
+		simplex->idxCount = lambdas[2] == 0.0f ? 2 : 3;
+		if (simplex->idxCount == 2) { simplex->idxCount = lambdas[1] == 0.0f ? 1 : 2; }
 		break;
 	case 4: 
 		SignedDistance3D(simplex, lambdas);
-		v += lambdas[0] * XMLoadFloat3(&simplex[0]);
-		v += lambdas[1] * XMLoadFloat3(&simplex[1]);
-		v += lambdas[2] * XMLoadFloat3(&simplex[2]);
-		v += lambdas[3] * XMLoadFloat3(&simplex[3]);
+		v += lambdas[0] * XMLoadFloat3(&simplex->ptOnSimplex[0]);
+		v += lambdas[1] * XMLoadFloat3(&simplex->ptOnSimplex[1]);
+		v += lambdas[2] * XMLoadFloat3(&simplex->ptOnSimplex[2]);
+		v += lambdas[3] * XMLoadFloat3(&simplex->ptOnSimplex[3]);
 		v = v * -1.0f;
 
 		XMStoreFloat3(newDir, v);
-		*idxCount = lambdas[3] == 0.0f ? 3 : 4;
-		*idxCount = lambdas[2] == 0.0f ? 2 : 3;
-		*idxCount = (*idxCount == 2 && lambdas[1] == 0.0f) ? 1 : 2;
-
+		simplex->idxCount = lambdas[3] == 0.0f ? 3 : 4;
+		simplex->idxCount = lambdas[2] == 0.0f ? 2 : 3;
+		simplex->idxCount = (simplex->idxCount == 2 && lambdas[1] == 0.0f) ? 1 : 2;
 		break;
 	default:
 		exit(-1);
@@ -287,30 +329,40 @@ static void GetSupport(
 	Body* bodyB, 
 	const XMFLOAT3* dir, 
 	XMFLOAT3* support,
+	XMFLOAT3* ptOnA,
+	XMFLOAT3* ptOnB,
 	float bias)
 {
-	XMFLOAT3 supportA = {}, supportB = {};
 	XMFLOAT3 negateDir = { dir->x * -1.0f, dir->y * -1.0f, dir->z * -1.0f };
 
-	bodyA->shape.supportFunction(&bodyA->shape, &bodyA->position, dir, &supportA, bias);
-	bodyB->shape.supportFunction(&bodyB->shape, &bodyB->position, &negateDir, &supportB, bias);
+	bodyA->shape.supportFunction(&bodyA->shape, &bodyA->position, dir, ptOnA, bias);
+	bodyB->shape.supportFunction(&bodyB->shape, &bodyB->position, &negateDir, ptOnB, bias);
 
-	XMVECTOR VecSupportA = XMLoadFloat3(&supportA);
-	XMVECTOR VecSupportB = XMLoadFloat3(&supportB);
+	XMVECTOR VecSupportA = XMLoadFloat3(ptOnA);
+	XMVECTOR VecSupportB = XMLoadFloat3(ptOnB);
 
 	XMStoreFloat3(support, XMVectorSubtract(VecSupportA, VecSupportB));
 }
 
+static void GetSupport(
+	Body* bodyA,
+	Body* bodyB,
+	const XMFLOAT3* dir,
+	SupportPoint* supportPoint,
+	float bias)
+{
+	return GetSupport(bodyA, bodyB, dir, &supportPoint->ptOnSimplex, &supportPoint->ptOnA, &supportPoint->ptOnB, bias);
+}
+
 static bool HasPoint(
-	const XMFLOAT3* simplex,
-	const XMFLOAT3* newPoint,
-	const uint8_t idxCount)
+	const Simplex* simplex,
+	const SupportPoint* newPoint)
 {
 	constexpr float eps = 0.0001;
-	XMVECTOR vecNewPoint = XMLoadFloat3(newPoint);
-	for (uint8_t i = 0; i < idxCount; i++)
+	XMVECTOR vecNewPoint = XMLoadFloat3(&newPoint->ptOnSimplex);
+	for (uint8_t i = 0; i < simplex->idxCount; i++)
 	{
-		XMVECTOR diffVec = XMLoadFloat3(&simplex[i]) - vecNewPoint;
+		XMVECTOR diffVec = XMLoadFloat3(&simplex->ptOnSimplex[i]) - vecNewPoint;
 		float lengthSq;
 		XMStoreFloat(&lengthSq, XMVector3LengthSq(diffVec));
 		if (lengthSq < eps * eps)
@@ -330,36 +382,38 @@ static bool GjkIntersectionTest(
 	constexpr float epsilon = 0.0001;
 	constexpr uint8_t maxIters = 10;
 
-	XMFLOAT3 simplex[4];
-	uint8_t idxCount = 1;
+	Simplex simplex;
 	XMFLOAT3 dir = { 0, 1, 0 };
 	float lambdas[4] = {};
-	XMFLOAT3 support;
+	SupportPoint support;
 	uint8_t iterCount = 0;
-	GetSupport(bodyA, bodyB, &dir, &simplex[0], bias);
-	XMVECTOR vecDir = XMLoadFloat3(&simplex[0]) * -1.0f;
+
+	GetSupport(bodyA, bodyB, &dir, &support, bias);
+	simplex.AddSupport(&support);
+	XMVECTOR vecDir = XMLoadFloat3(&simplex.ptOnSimplex[0]) * -1.0f;
 	XMStoreFloat3(&dir, vecDir);
 	bool hasOrigin = false;
-	float closestDistSq = simplex[0].x * simplex[0].x + simplex[0].y * simplex[0].y + simplex[0].z * simplex[0].z;
+	float closestDistSq = simplex.ptOnSimplex[0].x * simplex.ptOnSimplex[0].x + 
+						  simplex.ptOnSimplex[0].y * simplex.ptOnSimplex[0].y + 
+						  simplex.ptOnSimplex[0].z * simplex.ptOnSimplex[0].z;
 	while (!hasOrigin && iterCount < maxIters)
 	{
 		vecDir = XMLoadFloat3(&dir);
 		GetSupport(bodyA, bodyB, &dir, &support, bias);
-		if (HasPoint(simplex, &support, idxCount))
+		if (HasPoint(&simplex, &support))
 		{
 			break;
 		}
-		simplex[idxCount] = support;
-		idxCount++;
+		simplex.AddSupport(&support);
 
 		float dotProd;
-		XMStoreFloat(&dotProd, XMVector3Dot(vecDir, XMLoadFloat3(&simplex[idxCount- 1])));
+		XMStoreFloat(&dotProd, XMVector3Dot(vecDir, XMLoadFloat3(&simplex.ptOnSimplex[simplex.idxCount- 1])));
 		if (dotProd < 0.0f)
 		{
 			break;
 		}
 
-		DistanceSubalgorithm(simplex, &idxCount, lambdas, &dir);
+		DistanceSubalgorithm(&simplex, lambdas, &dir);
 		float newDistSq = dir.x * dir.x + dir.y * dir.y + dir.z * dir.z;
 
 		if (newDistSq < epsilon * epsilon)
@@ -374,38 +428,51 @@ static bool GjkIntersectionTest(
 		}
 
 		closestDistSq = newDistSq;
-		hasOrigin = idxCount == 4;
+		hasOrigin = simplex.idxCount == 4;
 		iterCount++;
 	}
 
+	if (!hasOrigin)
+	{
+		return false;
+	}
 	// if simplex is not Tetrahedron build it
-	if (idxCount == 1)
+	if (simplex.idxCount == 1)
 	{
 		XMFLOAT3 searchDir;
-		XMStoreFloat3(&searchDir, XMLoadFloat3(&simplex[0]) * -1.0f);
-		GetSupport(bodyA, bodyB, &searchDir, &simplex[idxCount], bias);
-		idxCount++;
+		XMStoreFloat3(&searchDir, XMLoadFloat3(&simplex.ptOnSimplex[0]) * -1.0f);
+
+		SupportPoint supp;
+		GetSupport(bodyA, bodyB, &searchDir, &supp, bias);
+		simplex.AddSupport(&supp);
 	}
-	if (idxCount == 2)
+	if (simplex.idxCount == 2)
 	{
-		XMFLOAT3 n = {simplex[1].x - simplex[0].x, simplex[1].y - simplex[0].y, simplex[1].z - simplex[0].z };
+		XMFLOAT3 n = {simplex.ptOnSimplex[1].x - simplex.ptOnSimplex[0].x,
+					  simplex.ptOnSimplex[1].y - simplex.ptOnSimplex[0].y,
+					  simplex.ptOnSimplex[1].z - simplex.ptOnSimplex[0].z };
 		XMFLOAT3 u, v;
 		GetOrtho(&n, &u, &v);
 
-		GetSupport(bodyA, bodyB, &u, &simplex[idxCount], bias);
-		idxCount++;
+		SupportPoint supp;
+		GetSupport(bodyA, bodyB, &u, &supp, bias);
+		simplex.AddSupport(&supp);
 	}
-	if (idxCount == 3)
+	if (simplex.idxCount == 3)
 	{
-		XMVECTOR ab = XMLoadFloat3(&simplex[1]) - XMLoadFloat3(&simplex[0]);
-		XMVECTOR ac = XMLoadFloat3(&simplex[2]) - XMLoadFloat3(&simplex[0]);
+		XMVECTOR ab = XMLoadFloat3(&simplex.ptOnSimplex[1]) - XMLoadFloat3(&simplex.ptOnSimplex[0]);
+		XMVECTOR ac = XMLoadFloat3(&simplex.ptOnSimplex[2]) - XMLoadFloat3(&simplex.ptOnSimplex[0]);
 		XMFLOAT3 newDir;
 		XMStoreFloat3(&newDir, XMVector3Cross(ab, ac));
 
-		GetSupport(bodyA, bodyB, &newDir, &simplex[idxCount], bias);
-		idxCount++;
+		SupportPoint supp;
+		GetSupport(bodyA, bodyB, &newDir, &supp, bias);
+		simplex.AddSupport(&supp);
+		
 	}
-	return hasOrigin;
+
+	EpaContactInfo(bodyA, bodyB, bias, &simplex, &contact->ptOnA, &contact->ptOnB);
+	return true;
 }
 
 bool CheckIntersection(
