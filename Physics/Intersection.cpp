@@ -1,8 +1,14 @@
 #include "Intersection.hpp"
 #include <cstdlib>
-
+#include <vector>
+using namespace std;
 using namespace DirectX;
-
+struct Triangle
+{
+	uint16_t a; 
+	uint16_t b;
+	uint16_t c;
+};
 struct SupportPoint
 {
 	XMFLOAT3 ptOnSimplex;
@@ -17,7 +23,7 @@ struct Simplex
 	XMFLOAT3 ptOnA[4];
 	XMFLOAT3 ptOnB[4];
 
-	Simplex() : idxCount(0) {}
+	Simplex() : idxCount(0), ptOnSimplex(), ptOnA(), ptOnB() {}
 
 	void AddSupport(const SupportPoint* supp)
 	{
@@ -42,6 +48,120 @@ static bool inline CompareSigns(
 	return (a > 0 && b > 0) || (b < 0 && a < 0);
 }
 
+static void GetSupport(
+	const Body* bodyA,
+	const Body* bodyB,
+	const XMFLOAT3* dir,
+	XMFLOAT3* support,
+	XMFLOAT3* ptOnA,
+	XMFLOAT3* ptOnB,
+	float bias)
+{
+	XMFLOAT3 negateDir = { dir->x * -1.0f, dir->y * -1.0f, dir->z * -1.0f };
+
+	bodyA->shape.supportFunction(&bodyA->shape, &bodyA->position, dir, ptOnA, bias);
+	bodyB->shape.supportFunction(&bodyB->shape, &bodyB->position, &negateDir, ptOnB, bias);
+
+	XMVECTOR VecSupportA = XMLoadFloat3(ptOnA);
+	XMVECTOR VecSupportB = XMLoadFloat3(ptOnB);
+
+	XMStoreFloat3(support, XMVectorSubtract(VecSupportA, VecSupportB));
+}
+
+
+static void GetSupport(
+	const Body* bodyB,
+	const Body* bodyA,
+	const XMFLOAT3* dir,
+	SupportPoint* supportPoint,
+	float bias)
+{
+	return GetSupport(bodyA, bodyB, dir, &supportPoint->ptOnSimplex, &supportPoint->ptOnA, &supportPoint->ptOnB, bias);
+}
+
+static float SignedDistanceToSurface(
+	const XMFLOAT3* p0,
+	const XMFLOAT3* p1,
+	const XMFLOAT3* p2,
+	const XMFLOAT3* point)
+{
+	XMVECTOR vec10 = XMLoadFloat3(p1) - XMLoadFloat3(p0);
+	XMVECTOR vec20 = XMLoadFloat3(p2) - XMLoadFloat3(p0);
+	XMVECTOR vecP0 = XMLoadFloat3(point) - XMLoadFloat3(p0);
+	XMVECTOR n = XMVector3Cross(vec10, vec20);
+	n = XMVector3Normalize(n);
+
+	float dist;
+	XMStoreFloat(&dist, XMVector3Dot(n, vecP0));
+	return dist;
+}
+
+static bool HasPoint(
+	const SupportPoint& point,
+	const std::vector<Triangle>& triangles, 
+	const std::vector<SupportPoint>& vertecies) 
+{
+	const float epsilons = 0.001f * 0.001f;
+	XMVECTOR vec = XMLoadFloat3(&point.ptOnSimplex);
+	XMVECTOR delta;
+
+	for (int i = 0; i < triangles.size(); i++) 
+	{
+		const Triangle& tri = triangles[i];
+		XMVECTOR a = XMLoadFloat3(&vertecies[tri.a].ptOnSimplex);
+		XMVECTOR b = XMLoadFloat3(&vertecies[tri.b].ptOnSimplex);
+		XMVECTOR c = XMLoadFloat3(&vertecies[tri.c].ptOnSimplex);
+
+		float distA;
+		XMStoreFloat(&distA, XMVector3LengthSq(vec - a));
+		if (distA < epsilons)
+		{
+			return true;
+		}
+
+		float distB;
+		XMStoreFloat(&distB, XMVector3LengthSq(vec - b));
+		if (distB < epsilons)
+		{
+			return true;
+		}
+
+		float distC;
+		XMStoreFloat(&distC, XMVector3LengthSq(vec - c));
+		if (distC < epsilons )
+		{
+			return true;
+		}
+
+	}
+	return false;
+}
+
+
+static size_t NearestTriangleToPoint(
+	const std::vector<Triangle>& triangles, 
+	const std::vector<SupportPoint>& vertecies,
+	const XMFLOAT3* point)
+{
+	float distSq = 1e10;
+	size_t idx = 0;
+
+	for (size_t i = 0; i < triangles.size(); i++)
+	{
+		const Triangle& tri = triangles[i];
+		float localDist = SignedDistanceToSurface(&vertecies[tri.a].ptOnSimplex, &vertecies[tri.b].ptOnSimplex, 
+														&vertecies[tri.c].ptOnSimplex, point);
+		// localDist is negative so square is needed to remove - sign
+		if (localDist * localDist < distSq)
+		{
+			idx = i;
+			distSq = localDist * localDist;
+		}
+	}
+
+	return idx;
+}
+
 static float EpaContactInfo(
 	const Body* bodyA, 
 	const Body* bodyB,
@@ -50,10 +170,67 @@ static float EpaContactInfo(
 	XMFLOAT3* ptOnA,
 	XMFLOAT3* ptOnB)
 {
+
+	vector<SupportPoint> points;
+	vector<Triangle> triangles;
+
+	for (int i = 0; i < 4; i++)
+	{
+		SupportPoint simplexPoint = { simplexPoints->ptOnSimplex[i], simplexPoints->ptOnA[i] , simplexPoints->ptOnB[i] };
+		points.push_back(simplexPoint);
+	}
+
+
+	// Build the triangles
+	for (int i = 0; i < 4; i++) 
+	{
+		int j = (i + 1) % 4;
+		int k = (i + 2) % 4;
+		Triangle tri;
+		tri.a = i;
+		tri.b = j;
+		tri.c = k;
+		uint16_t unusedPt = (i + 3) % 4;
+
+		// check if normal is oriented outward
+		float dist = SignedDistanceToSurface(&points[tri.a].ptOnSimplex, &points[tri.b].ptOnSimplex, &points[tri.c].ptOnSimplex, &points[unusedPt].ptOnSimplex);
+		if (dist > 0.0f) 
+		{
+			std::swap(tri.a, tri.b);
+		}
+		triangles.push_back(tri);
+	}
+	XMFLOAT3 origin = { 0, 0, 0 };
+	XMFLOAT3 normal;
+	SupportPoint suppPoint;
+
+	while (true)
+	{
+		const size_t idx = NearestTriangleToPoint(triangles, points, &origin);
+		const Triangle& tri = triangles[idx];
+		XMVECTOR vecBA = XMLoadFloat3(&points[tri.b].ptOnSimplex) - XMLoadFloat3(&points[tri.a].ptOnSimplex);
+		XMVECTOR vecCA = XMLoadFloat3(&points[tri.c].ptOnSimplex) - XMLoadFloat3(&points[tri.a].ptOnSimplex);
+		XMVECTOR n = XMVector3Cross(vecBA, vecCA);
+		XMStoreFloat3(&normal, XMVector3Normalize(n));
+		GetSupport(bodyA, bodyB, &normal, &suppPoint, bias);
+
+		if (HasPoint(suppPoint, triangles, points))
+		{
+			break;
+		}
+		float dist = SignedDistanceToSurface(&points[tri.a].ptOnSimplex, &points[tri.b].ptOnSimplex, &points[tri.c].ptOnSimplex, &suppPoint.ptOnSimplex);
+		if (dist <= 0.0f) 
+		{
+			break;	// can't expand
+		}
+	}
 	return 0.0f;
 }
 
-static inline void GetOrtho(XMFLOAT3* n, XMFLOAT3* u, XMFLOAT3* v)
+static inline void GetOrtho(
+	XMFLOAT3* n, 
+	XMFLOAT3* u, 
+	XMFLOAT3* v)
 {
 	XMVECTOR nVec = XMLoadFloat3(n);
 	nVec = XMVector3Normalize(nVec);
@@ -322,36 +499,6 @@ static void DistanceSubalgorithm(
 	default:
 		exit(-1);
 	}
-}
-
-static void GetSupport(
-	Body* bodyA, 
-	Body* bodyB, 
-	const XMFLOAT3* dir, 
-	XMFLOAT3* support,
-	XMFLOAT3* ptOnA,
-	XMFLOAT3* ptOnB,
-	float bias)
-{
-	XMFLOAT3 negateDir = { dir->x * -1.0f, dir->y * -1.0f, dir->z * -1.0f };
-
-	bodyA->shape.supportFunction(&bodyA->shape, &bodyA->position, dir, ptOnA, bias);
-	bodyB->shape.supportFunction(&bodyB->shape, &bodyB->position, &negateDir, ptOnB, bias);
-
-	XMVECTOR VecSupportA = XMLoadFloat3(ptOnA);
-	XMVECTOR VecSupportB = XMLoadFloat3(ptOnB);
-
-	XMStoreFloat3(support, XMVectorSubtract(VecSupportA, VecSupportB));
-}
-
-static void GetSupport(
-	Body* bodyA,
-	Body* bodyB,
-	const XMFLOAT3* dir,
-	SupportPoint* supportPoint,
-	float bias)
-{
-	return GetSupport(bodyA, bodyB, dir, &supportPoint->ptOnSimplex, &supportPoint->ptOnA, &supportPoint->ptOnB, bias);
 }
 
 static bool HasPoint(

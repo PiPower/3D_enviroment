@@ -409,13 +409,13 @@ void Renderer::CreateControllingStructs()
     for (size_t i = 0; i < renderPassInfos.size(); i++)
     {
         renderPassInfos[i] = {};
-         renderPassInfos[i].sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-         renderPassInfos[i].renderPass = vkResources.renderPass;
-         renderPassInfos[i].framebuffer = vkResources.swapchainFramebuffers[i];
-         renderPassInfos[i].renderArea.offset = { 0, 0 };
-         renderPassInfos[i].renderArea.extent = vkResources.swapchainInfo.capabilities.currentExtent;
-         renderPassInfos[i].clearValueCount = 2;
-         renderPassInfos[i].pClearValues = clearColor;
+        renderPassInfos[i].sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfos[i].renderPass = vkResources.renderPass;
+        renderPassInfos[i].framebuffer = vkResources.swapchainFramebuffers[i];
+        renderPassInfos[i].renderArea.offset = { 0, 0 };
+        renderPassInfos[i].renderArea.extent = vkResources.swapchainInfo.capabilities.currentExtent;
+        renderPassInfos[i].clearValueCount = 2;
+        renderPassInfos[i].pClearValues = clearColor;
     }
 
     transferBarriers.resize(vkResources.swapchainImages.size() * 2);

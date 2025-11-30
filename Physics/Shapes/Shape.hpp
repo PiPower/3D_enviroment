@@ -10,7 +10,7 @@ typedef int64_t(*GetTrasformationMatrix)(
 
 // dir MUST BE normalized to 1
 typedef void(*SupportFunction)(
-	Shape* shape,
+	const Shape* shape,
 	const DirectX::XMFLOAT3* pos,
 	const DirectX::XMFLOAT3* dir, 
 	DirectX::XMFLOAT3* supportVec, 

@@ -34,7 +34,7 @@ static int64_t TransformationMatrix(
 }
 
 static void SupportFn(
-	Shape* shape,
+	const Shape* shape,
 	const DirectX::XMFLOAT3* pos,
 	const DirectX::XMFLOAT3* dir, 
 	DirectX::XMFLOAT3* supportVec, 

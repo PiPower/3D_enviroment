@@ -111,7 +111,6 @@ void Composer::UpdateObjects(
         {
             calculatePhysics = false;
         }
-        
     }
 
     for (size_t i = 0; i < physicsEntitiesTrsfm.size(); i++)
