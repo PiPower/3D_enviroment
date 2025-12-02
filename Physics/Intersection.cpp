@@ -9,6 +9,18 @@ struct Triangle
 	uint16_t b;
 	uint16_t c;
 };
+
+struct Edge
+{
+	uint16_t i;
+	uint16_t j;
+
+
+	bool operator == (const Edge& rhs) const {
+		return ((i== rhs.i && j == rhs.j) || (i == rhs.j && j == rhs.i));
+	}
+};
+
 struct SupportPoint
 {
 	XMFLOAT3 ptOnSimplex;
@@ -96,6 +108,31 @@ static float SignedDistanceToSurface(
 	return dist;
 }
 
+static size_t RemoveTrianglesFacingPoint(
+	std::vector<Triangle>* triangles,
+	const std::vector<SupportPoint>& vertecies,
+	const SupportPoint& pt)
+{
+	size_t removedTriangles = 0;
+	size_t triangleCount = triangles->size();
+	for (size_t i = 0; i < triangleCount; i++)
+	{
+		const Triangle& tri = (*triangles)[i];
+		float dist = SignedDistanceToSurface(&vertecies[tri.a].ptOnSimplex,
+			&vertecies[tri.b].ptOnSimplex, &vertecies[tri.c].ptOnSimplex, &pt.ptOnSimplex);
+
+		if (dist > 0.0f)
+		{
+			// This triangle faces the point.  Remove it.
+			triangles->erase(triangles->begin() + i);
+			i--;
+			triangleCount--;
+			removedTriangles++;
+		}
+	}
+	return removedTriangles;
+}
+
 static bool HasPoint(
 	const SupportPoint& point,
 	const std::vector<Triangle>& triangles, 
@@ -149,8 +186,8 @@ static size_t NearestTriangleToPoint(
 	for (size_t i = 0; i < triangles.size(); i++)
 	{
 		const Triangle& tri = triangles[i];
-		float localDist = SignedDistanceToSurface(&vertecies[tri.a].ptOnSimplex, &vertecies[tri.b].ptOnSimplex, 
-														&vertecies[tri.c].ptOnSimplex, point);
+		float localDist = SignedDistanceToSurface(&vertecies[tri.a].ptOnSimplex,
+					&vertecies[tri.b].ptOnSimplex, &vertecies[tri.c].ptOnSimplex, point);
 		// localDist is negative so square is needed to remove - sign
 		if (localDist * localDist < distSq)
 		{
@@ -160,6 +197,73 @@ static size_t NearestTriangleToPoint(
 	}
 
 	return idx;
+}
+
+static void FindDanglingEdges(
+	vector<Edge>* danglingEdges,
+	const vector<Triangle>& triangles)
+{
+	for (int i = 0; i < triangles.size(); i++) 
+	{
+		const Triangle& tri = triangles[i];
+
+		Edge edges[3];
+		edges[0].i = tri.a;
+		edges[0].j = tri.b;
+
+		edges[1].i = tri.b;
+		edges[1].j = tri.c;
+
+		edges[2].i = tri.c;
+		edges[2].j = tri.a;
+
+		int counts[3];
+		counts[0] = 0;
+		counts[1] = 0;
+		counts[2] = 0;
+
+		for (int j = 0; j < triangles.size(); j++) {
+			if (j == i) {
+				continue;
+			}
+
+			const Triangle& tri2 = triangles[j];
+
+			Edge edges2[3];
+			edges2[0].i = tri2.a;
+			edges2[0].j = tri2.b;
+
+			edges2[1].i = tri2.b;
+			edges2[1].j = tri2.c;
+
+			edges2[2].i = tri2.c;
+			edges2[2].j = tri2.a;
+
+			for (int k = 0; k < 3; k++) 
+			{
+				if (edges[k] == edges2[0])
+				{
+					counts[k]++;
+				}
+				if (edges[k] == edges2[1]) 
+				{
+					counts[k]++;
+				}
+				if (edges[k] == edges2[2]) 
+				{
+					counts[k]++;
+				}
+			}
+		}
+
+		for (int k = 0; k < 3; k++) 
+		{
+			if (0 == counts[k])
+			{
+				danglingEdges->push_back(edges[k]);
+			}
+		}
+	}
 }
 
 static float EpaContactInfo(
@@ -173,6 +277,7 @@ static float EpaContactInfo(
 
 	vector<SupportPoint> points;
 	vector<Triangle> triangles;
+	vector<Edge> danglinEdges;
 
 	for (int i = 0; i < 4; i++)
 	{
@@ -193,7 +298,8 @@ static float EpaContactInfo(
 		uint16_t unusedPt = (i + 3) % 4;
 
 		// check if normal is oriented outward
-		float dist = SignedDistanceToSurface(&points[tri.a].ptOnSimplex, &points[tri.b].ptOnSimplex, &points[tri.c].ptOnSimplex, &points[unusedPt].ptOnSimplex);
+		float dist = SignedDistanceToSurface(&points[tri.a].ptOnSimplex,
+			&points[tri.b].ptOnSimplex, &points[tri.c].ptOnSimplex, &points[unusedPt].ptOnSimplex);
 		if (dist > 0.0f) 
 		{
 			std::swap(tri.a, tri.b);
@@ -218,11 +324,22 @@ static float EpaContactInfo(
 		{
 			break;
 		}
-		float dist = SignedDistanceToSurface(&points[tri.a].ptOnSimplex, &points[tri.b].ptOnSimplex, &points[tri.c].ptOnSimplex, &suppPoint.ptOnSimplex);
+		float dist = SignedDistanceToSurface(&points[tri.a].ptOnSimplex,
+				&points[tri.b].ptOnSimplex, &points[tri.c].ptOnSimplex, &suppPoint.ptOnSimplex);
 		if (dist <= 0.0f) 
 		{
 			break;	// can't expand
 		}
+
+		points.push_back(suppPoint);
+		size_t numRemoved = RemoveTrianglesFacingPoint(&triangles, points, suppPoint);
+		if (0 == numRemoved) 
+		{
+			break;
+		}
+
+		danglinEdges.clear();
+		FindDanglingEdges(&danglinEdges, triangles);
 	}
 	return 0.0f;
 }
