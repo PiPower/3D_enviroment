@@ -3,6 +3,14 @@
 #include <vector>
 using namespace std;
 using namespace DirectX;
+
+
+template<typename T>
+bool inline CheckIfNotNaN(const T& v)
+{
+	return v * 0 == v * 0; 
+}
+
 struct Triangle
 {
 	uint16_t a; 
@@ -266,6 +274,71 @@ static void FindDanglingEdges(
 	}
 }
 
+static void BarycentricCoords(
+	XMFLOAT3* p1,
+	XMFLOAT3* p2,
+	XMFLOAT3* p3,
+	float* lambdas)
+{
+	XMVECTOR s1 = XMLoadFloat3(p1);
+	XMVECTOR s2 = XMLoadFloat3(p2);
+	XMVECTOR s3 = XMLoadFloat3(p3);
+
+	XMVECTOR n = XMVector3Cross(s2 - s1, s3 - s1);
+	XMVECTOR p0 = (XMVector3Dot(s1, n) * n) / XMVector3LengthSq(n);
+
+	float diff21[3], diff31[3];
+	XMStoreFloat3((XMFLOAT3*)&diff21, s2 - s1);
+	XMStoreFloat3((XMFLOAT3*)&diff31, s3 - s1);
+
+	uint8_t idx = 0;
+	float mu_max = 0;
+	for (uint8_t i = 0; i < 3; i++)
+	{
+		uint8_t k = (i + 1) % 3;
+		uint8_t l = (i + 2) % 3;
+
+		float mu = diff21[k] * diff31[l] - diff21[l] * diff31[k];
+		if (mu * mu > mu_max * mu_max)
+		{
+			mu_max = mu;
+			idx = i;
+		}
+	}
+
+	uint8_t x = (idx + 1) % 3;
+	uint8_t y = (idx + 2) % 3;
+	float diffSP[9];
+	XMStoreFloat3((XMFLOAT3*)diffSP, s1 - p0);
+	XMStoreFloat3((XMFLOAT3*)(diffSP + 3), s2 - p0);
+	XMStoreFloat3((XMFLOAT3*)(diffSP + 6), s3 - p0);
+
+	float C[3];
+	for (uint8_t i = 0; i < 3; i++)
+	{
+		uint8_t k = (i + 1) % 3;
+		uint8_t l = (i + 2) % 3;
+
+		C[i] = diffSP[k * 3 + x] * diffSP[l * 3 + y] - diffSP[k * 3 + y] * diffSP[l * 3 + x];
+	}
+
+	// check if every component is not NaN 
+	if (CheckIfNotNaN(C[0]) || CheckIfNotNaN(C[1]) || CheckIfNotNaN(C[2]))
+	{
+		lambdas[0] = C[0] / mu_max;
+		lambdas[1] = C[1] / mu_max;
+		lambdas[2] = C[2] / mu_max;
+		return;
+	}
+	else
+	{
+		lambdas[0] = 1.0f;
+		lambdas[1] = 0;
+		lambdas[2] = 0;
+	}
+
+}
+
 static float EpaContactInfo(
 	const Body* bodyA, 
 	const Body* bodyB,
@@ -375,8 +448,25 @@ static float EpaContactInfo(
 
 	}
 	const int idx = NearestTriangleToPoint(triangles, points, &origin);
+	const Triangle& tri = triangles[idx];
+	float lambdas[3];
+	BarycentricCoords(&points[tri.a].ptOnSimplex, &points[tri.b].ptOnSimplex, &points[tri.c].ptOnSimplex, lambdas);
 
-	return 0.0f;
+	XMVECTOR vecPtA = XMLoadFloat3(&points[tri.a].ptOnA) * lambdas[0] +
+		XMLoadFloat3(&points[tri.c].ptOnA) * lambdas[2] +
+		XMLoadFloat3(&points[tri.b].ptOnA) * lambdas[1];
+
+
+	XMVECTOR vecPtB = XMLoadFloat3(&points[tri.a].ptOnB) * lambdas[0] +
+		XMLoadFloat3(&points[tri.b].ptOnB) * lambdas[1] +
+		XMLoadFloat3(&points[tri.c].ptOnB) * lambdas[2];
+	
+	XMStoreFloat3(ptOnA, vecPtA);
+	XMStoreFloat3(ptOnB, vecPtB);
+
+	float dist;
+	XMStoreFloat(&dist, XMVector3Length(vecPtA - vecPtB));
+	return dist;
 }
 
 static inline void GetOrtho(
