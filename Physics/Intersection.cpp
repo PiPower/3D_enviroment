@@ -277,15 +277,21 @@ static float EpaContactInfo(
 
 	vector<SupportPoint> points;
 	vector<Triangle> triangles;
-	vector<Edge> danglinEdges;
+	vector<Edge> danglingEdges;
 
+	XMFLOAT3 center = {};
 	for (int i = 0; i < 4; i++)
 	{
 		SupportPoint simplexPoint = { simplexPoints->ptOnSimplex[i], simplexPoints->ptOnA[i] , simplexPoints->ptOnB[i] };
 		points.push_back(simplexPoint);
+		center.x += simplexPoint.ptOnSimplex.x;
+		center.y += simplexPoint.ptOnSimplex.y;
+		center.z += simplexPoint.ptOnSimplex.z;
 	}
 
-
+	center.x *= 0.25; 
+	center.y *= 0.25; 
+	center.z *= 0.25; 
 	// Build the triangles
 	for (int i = 0; i < 4; i++) 
 	{
@@ -338,9 +344,38 @@ static float EpaContactInfo(
 			break;
 		}
 
-		danglinEdges.clear();
-		FindDanglingEdges(&danglinEdges, triangles);
+		danglingEdges.clear();
+		FindDanglingEdges(&danglingEdges, triangles);
+
+		if (0 == danglingEdges.size())
+		{
+			break;
+		}
+
+		for (int i = 0; i < danglingEdges.size(); i++) 
+		{
+			const Edge& edge = danglingEdges[i];
+
+			Triangle tri;
+			tri.a = points.size() - 1;
+			tri.b = edge.j;
+			tri.c = edge.i;
+
+			// Make sure it's oriented properly
+			float dist = SignedDistanceToSurface(&points[tri.a].ptOnSimplex,
+				&points[tri.b].ptOnSimplex, &points[tri.c].ptOnSimplex, &center);
+
+			if (dist > 0.0f) 
+			{
+				std::swap(tri.b, tri.c);
+			}
+
+			triangles.push_back(tri);
+		}
+
 	}
+	const int idx = NearestTriangleToPoint(triangles, points, &origin);
+
 	return 0.0f;
 }
 
