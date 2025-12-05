@@ -33,6 +33,9 @@ private:
 		ShapeType type,
 		DirectX::XMFLOAT3 scales);
 
+	void ResolveContact(
+		Contact* contact
+	);
 
 private:
 	std::vector<Body> staticBodies;

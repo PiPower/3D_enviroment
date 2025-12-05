@@ -453,8 +453,8 @@ static float EpaContactInfo(
 	BarycentricCoords(&points[tri.a].ptOnSimplex, &points[tri.b].ptOnSimplex, &points[tri.c].ptOnSimplex, lambdas);
 
 	XMVECTOR vecPtA = XMLoadFloat3(&points[tri.a].ptOnA) * lambdas[0] +
-		XMLoadFloat3(&points[tri.c].ptOnA) * lambdas[2] +
-		XMLoadFloat3(&points[tri.b].ptOnA) * lambdas[1];
+		XMLoadFloat3(&points[tri.b].ptOnA) * lambdas[1] +
+		XMLoadFloat3(&points[tri.c].ptOnA) * lambdas[2];
 
 
 	XMVECTOR vecPtB = XMLoadFloat3(&points[tri.a].ptOnB) * lambdas[0] +
@@ -878,21 +878,25 @@ bool CheckIntersection(
 	{
 		if (GjkIntersectionTest(bodyA, bodyB, contact, 0.001))
 		{
+			auto z = XMLoadFloat3(&contact->ptOnB) - XMLoadFloat3(&contact->ptOnA);
+			XMStoreFloat3(&contact->normal,
+				XMVector3Normalize(XMLoadFloat3(&contact->ptOnB) - XMLoadFloat3(&contact->ptOnA))
+			);
+
 			contact->timeOfImpact = total_time;
 			contact->bodyA = bodyA;
 			contact->bodyB = bodyB;
-
-			UpdateBody(bodyA, -total_time);
-			UpdateBody(bodyB, -total_time);
+			bodyA->UpdateBody(-total_time);
+			bodyB->UpdateBody(-total_time);
 			return true;
 		}
-
-		UpdateBody(bodyA, stepSize);
-		UpdateBody(bodyB, stepSize);
+		bodyA->UpdateBody(stepSize);
+		bodyB->UpdateBody(stepSize);
 		total_time += stepSize;
 	}
 
-	UpdateBody(bodyA, -dt);
-	UpdateBody(bodyB, -dt);
+	bodyA->UpdateBody(-dt);
+	bodyB->UpdateBody(-dt);
+
 	return false;
 }

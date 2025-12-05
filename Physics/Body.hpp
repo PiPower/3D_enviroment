@@ -25,8 +25,11 @@ struct Body
 	float massInv;
 
 	Shape shape;
+
+	void UpdateBody(
+		float dt);
+
+	void ApplyLinearImpulse(
+		DirectX::XMFLOAT3* Impulse);
 };
 
-void UpdateBody(
-	Body* body,
-	float dt);

@@ -2,6 +2,7 @@
 #include "Shapes//ShapeBox.hpp"
 #include <inttypes.h>
 #include "Intersection.hpp"
+#include <algorithm>
 
 using namespace std;
 using namespace DirectX;
@@ -79,6 +80,29 @@ Shape PhysicsEnigne::CreateDefaultShape(
 	};
 }
 
+void PhysicsEnigne::ResolveContact(
+	Contact* contact)
+{
+	Body* bodyA = contact->bodyA;
+	Body* bodyB= contact->bodyB;
+
+	float totalMassInv = 1.0f/(bodyA->massInv + bodyB->massInv);
+
+	XMVECTOR I_A = totalMassInv * (XMLoadFloat3(&bodyB->linVelocity) - XMLoadFloat3(&bodyA->linVelocity));
+	XMVECTOR I_B = -I_A;
+	XMVECTOR totalImpulse = I_A - I_B;
+	XMVECTOR closingSpeed = XMVector3Dot(I_A - I_B, XMLoadFloat3(&contact->normal));
+	XMVECTOR yolo = -2.0f * XMVector3Dot(XMLoadFloat3(&bodyA->linVelocity) - XMLoadFloat3(&bodyB->linVelocity), XMLoadFloat3(&contact->normal)) / (bodyA->massInv + bodyB->massInv);
+	XMVECTOR reboundImpulse = XMLoadFloat3(&contact->normal) * closingSpeed;
+
+	XMFLOAT3 ImpulseStorage;
+	XMStoreFloat3(&ImpulseStorage, reboundImpulse);
+	bodyA->ApplyLinearImpulse(&ImpulseStorage);
+
+	XMStoreFloat3(&ImpulseStorage, -reboundImpulse);
+	bodyB->ApplyLinearImpulse(&ImpulseStorage);
+}
+
 int64_t PhysicsEnigne::AddBody(
 	const BodyProperties& props,
 	ShapeType shapeType,
@@ -104,6 +128,7 @@ int64_t PhysicsEnigne::AddBody(
 	}
 	else
 	{
+		body.massInv = 0.0f;
 		staticBodies.push_back(body);
 		*bodyId = staticBodies.size();
 		*bodyId |= STATIC_FLAG;
@@ -137,23 +162,24 @@ int64_t PhysicsEnigne::UpdateBodies(float dt)
 		XMVECTOR v = XMLoadFloat3(&body->linVelocity) + dv;
 		XMStoreFloat3(&body->linVelocity, v);
 	}
-
+	
 	FindIntersections(dt);
-
+	sort(contactPoints.begin(), contactPoints.begin() + detectedIntersections, [](const Contact& l, const Contact& r)
+		{
+			return l.timeOfImpact < r.timeOfImpact;
+		}
+	);
 
 	for (size_t i = 0; i < detectedIntersections; i++)
 	{
 		Contact& contact = contactPoints[i];
-		contact.bodyA->linVelocity = { 0 ,0 ,0 };
-		contact.bodyB->linVelocity = { 0 ,0 ,0 };
-
+		ResolveContact(&contactPoints[i]);
 	}
 
 	for (size_t i = 0; i < dynamicBodies.size(); i++)
 	{
-		UpdateBody(&dynamicBodies[i], dt);
+		dynamicBodies[i].UpdateBody(dt);
 	}
-
 
 	return 0;
 }

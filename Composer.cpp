@@ -51,6 +51,7 @@ void Composer::GenerateObjects()
     std::random_device rd;  // Will be used to obtain a seed for the random number engine
     std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
     std::uniform_real_distribution<> dis(0, 1.0);
+    std::uniform_real_distribution<> speedDees(0, 3.0);
     constexpr uint8_t boxCount = 5;
     physicsEntities.resize(boxCount * boxCount + 1);
     physicsEntitiesTrsfm.resize(boxCount * boxCount + 1);
@@ -63,8 +64,8 @@ void Composer::GenerateObjects()
             renderEntities.push_back({ 0, 0, rectUbo, 0 });
 
             BodyProperties bodyProps;
-            bodyProps.position = { -(float)boxCount * 2 + i * 4, 3, -(float)boxCount * 2 + j * 4.0f };
-            bodyProps.linVelocity = { 0, 0, 0 };
+            bodyProps.position = { -(float)boxCount * 2 + i * 4, 6, -(float)boxCount * 2 + j * 4.0f };
+            bodyProps.linVelocity = { 0, 0, 0};
             bodyProps.angVelocity = { 0, 0, 0 };
             bodyProps.massInv = 1.0f / 10.0f;
             bodyProps.rotation = { 0, 0, 0 };
