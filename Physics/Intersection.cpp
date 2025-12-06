@@ -90,8 +90,8 @@ static void GetSupport(
 
 
 static void GetSupport(
-	const Body* bodyB,
 	const Body* bodyA,
+	const Body* bodyB,
 	const XMFLOAT3* dir,
 	SupportPoint* supportPoint,
 	float bias)
@@ -735,8 +735,8 @@ static void DistanceSubalgorithm(
 
 		XMStoreFloat3(newDir, v);
 		simplex->idxCount = lambdas[3] == 0.0f ? 3 : 4;
-		simplex->idxCount = lambdas[2] == 0.0f ? 2 : 3;
-		simplex->idxCount = (simplex->idxCount == 2 && lambdas[1] == 0.0f) ? 1 : 2;
+		if (simplex->idxCount == 3) { simplex->idxCount = lambdas[2] == 0.0f ? 2 : 3; }
+		if (simplex->idxCount == 2) { simplex->idxCount = lambdas[1] == 0.0f ? 1 : 2; }
 		break;
 	default:
 		exit(-1);
@@ -825,6 +825,8 @@ static bool GjkIntersectionTest(
 	{
 		return false;
 	}
+
+	//GjkIntersectionTest(bodyA, bodyB, contact, bias);
 	// if simplex is not Tetrahedron build it
 	if (simplex.idxCount == 1)
 	{

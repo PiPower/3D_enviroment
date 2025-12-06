@@ -60,6 +60,7 @@ static void SupportFn(
 			XMStoreFloat3(supportVec, vert);
 		}
 	}
+	XMStoreFloat3(supportVec, XMLoadFloat3(supportVec) + XMVector3Normalize(dirVec) * bias);
 }
 Shape GetDefaultBoxShape(
 	DirectX::XMFLOAT3 scales)
