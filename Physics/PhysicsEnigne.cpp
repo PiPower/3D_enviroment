@@ -101,6 +101,16 @@ void PhysicsEnigne::ResolveContact(
 
 	XMStoreFloat3(&ImpulseStorage, -reboundImpulse);
 	bodyB->ApplyLinearImpulse(&ImpulseStorage);
+
+
+	// projecting bodies outside of eachother
+	if (contact->timeOfImpact == 0.0f)
+	{
+		XMVECTOR dist = XMLoadFloat3(&contact->ptOnB) - XMLoadFloat3(&contact->ptOnA);
+
+		XMStoreFloat3(&bodyA->position, XMLoadFloat3(&bodyA->position) + dist * bodyA->massInv / totalMassInv);
+		XMStoreFloat3(&bodyB->position, XMLoadFloat3(&bodyB->position) + dist * bodyB->massInv / totalMassInv);
+	}
 }
 
 int64_t PhysicsEnigne::AddBody(
