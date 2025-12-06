@@ -422,12 +422,21 @@ static float EpaContactInfo(
 		}
 
 		points.push_back(suppPoint);
+#ifdef _DEBUG
+		// temporary to check if all 4 vertecies create 2D plane
+		vector<Triangle> tr2 = triangles;
+		RemoveTrianglesFacingPoint(&tr2, points, suppPoint);
+		if (tr2.size() == 0)
+		{
+			int x = 2;
+			EpaContactInfo(bodyA, bodyB, bias, simplexPoints, ptOnA,ptOnB);
+		}
+#endif // DEBUG
 		size_t numRemoved = RemoveTrianglesFacingPoint(&triangles, points, suppPoint);
 		if (0 == numRemoved) 
 		{
 			break;
 		}
-
 		danglingEdges.clear();
 		FindDanglingEdges(&danglingEdges, triangles);
 
@@ -794,7 +803,6 @@ static bool GjkIntersectionTest(
 		{
 			break;
 		}
-
 		DistanceSubalgorithm(&simplex, lambdas, &dir);
 		float newDistSq = dir.x * dir.x + dir.y * dir.y + dir.z * dir.z;
 
@@ -811,11 +819,14 @@ static bool GjkIntersectionTest(
 
 		// sort by lamdas
 		int8_t last = simplex.idxCount - 1;
-		for (int8_t i = simplex.idxCount - 2; i >= 0; i--)
+		for (int8_t i = simplex.idxCount - 1; i >= 0; i--)
 		{
 			if (lambdas[i] == 0.0f)
 			{
-				simplex.SwapSupports(i, last);
+				for (int8_t j = i + 1; j <= last; j++)
+				{
+					simplex.SwapSupports(j - 1, j);
+				}
 				last--;
 			}
 		}
@@ -866,6 +877,33 @@ static bool GjkIntersectionTest(
 		simplex.AddSupport(&supp);
 		
 	}
+	//
+	// Expand the simplex by the bias amount
+	//
+	XMVECTOR avg = XMVectorZero();
+
+
+	for (int i = 0; i < 4; i++) 
+	{
+		avg += XMLoadFloat3(&simplex.ptOnSimplex[i]);
+	}
+	avg *= 0.25f;
+	
+	// Now expand the simplex by the bias amount
+	for (int i = 0; i < 4; i++) 
+	{
+
+		XMVECTOR dir = XMLoadFloat3(&simplex.ptOnSimplex[i]) - avg;	// ray from "center" to witness point
+		dir = XMVector3Normalize(dir);
+
+		XMVECTOR ptA = XMLoadFloat3(&simplex.ptOnA[i]) + dir * bias;
+		XMVECTOR ptB = XMLoadFloat3(&simplex.ptOnB[i]) - dir * bias;
+		
+		XMStoreFloat3(&simplex.ptOnB[i], ptB);
+		XMStoreFloat3(&simplex.ptOnA[i], ptA);
+		XMStoreFloat3(&simplex.ptOnSimplex[i], ptA - ptB);
+	}
+	
 
 	EpaContactInfo(bodyA, bodyB, bias, &simplex, &contact->ptOnA, &contact->ptOnB);
 	return true;
