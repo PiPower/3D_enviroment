@@ -59,6 +59,17 @@ struct Simplex
 		ptOnB[idxCount] = simplex->ptOnB[idx];
 		idxCount++;
 	}
+
+	void SwapSupports(uint8_t i, uint8_t j)
+	{
+		std::swap(ptOnSimplex[i], ptOnSimplex[j]);
+		std::swap(ptOnA[i], ptOnA[j]);
+		std::swap(ptOnB[i], ptOnB[j]);
+	}
+	void Clear()
+	{
+		idxCount = 0;
+	}
 };
 
 static bool inline CompareSigns(
@@ -590,10 +601,8 @@ static void SignedDistance2D(
 	}
 
 	float dist = 1000000000.0f;
-	Simplex simplexBuffer;
 	for (uint8_t i = 0; i < 3; i++)
 	{
-
 		uint8_t k = (i + 1) % 3;
 		uint8_t l = (i + 2) % 3;
 		Simplex simplexLocal;
@@ -612,15 +621,11 @@ static void SignedDistance2D(
 		if (distSq < dist)
 		{
 			dist = distSq;
-
-			lambdas[0] = edgeLambdas[0];
-			lambdas[1] = edgeLambdas[1];
-			lambdas[2] = 0.0f;
-
-			simplexBuffer = simplexLocal;
+			lambdas[i] = 0.0f;
+			lambdas[k] = edgeLambdas[0];
+			lambdas[l] = edgeLambdas[1];
 		}
 	}
-	*simplex = simplexBuffer;
 }
 
 static void SignedDistance3D(
@@ -655,7 +660,6 @@ static void SignedDistance3D(
 
 
 	float dist = 1000000000.0f;
-	Simplex simplexBuffer;
 	for (uint8_t i = 0; i < 4; i++)
 	{
 		uint8_t k = (i + 1) % 4;
@@ -678,17 +682,12 @@ static void SignedDistance3D(
 		if (distSq < dist)
 		{
 			dist = distSq;
-
-			lambdas[0] = edgeLambdas[0];
-			lambdas[1] = edgeLambdas[1];
-			lambdas[2] = edgeLambdas[2];
-			lambdas[3] = 0.0f;
-
-			simplexBuffer = localSimplex;
+			memset(lambdas, 0, sizeof(float) * 4);
+			lambdas[i] = edgeLambdas[0];
+			lambdas[k] = edgeLambdas[1];
+			lambdas[l] = edgeLambdas[2];
 		}
 	}
-	*simplex = simplexBuffer;
-
 }
 /*
 	Base od distance algorithm sets 
@@ -712,7 +711,6 @@ static void DistanceSubalgorithm(
 		v = v * -1.0f;
 
 		XMStoreFloat3(newDir, v);
-		simplex->idxCount = lambdas[1] == 0.0f ? 1 : 2;
 		break;
 	case 3:
 		SignedDistance2D(simplex, lambdas);
@@ -722,8 +720,6 @@ static void DistanceSubalgorithm(
 		v = v * -1.0f;
 
 		XMStoreFloat3(newDir, v);
-		simplex->idxCount = lambdas[2] == 0.0f ? 2 : 3;
-		if (simplex->idxCount == 2) { simplex->idxCount = lambdas[1] == 0.0f ? 1 : 2; }
 		break;
 	case 4: 
 		SignedDistance3D(simplex, lambdas);
@@ -734,9 +730,6 @@ static void DistanceSubalgorithm(
 		v = v * -1.0f;
 
 		XMStoreFloat3(newDir, v);
-		simplex->idxCount = lambdas[3] == 0.0f ? 3 : 4;
-		if (simplex->idxCount == 3) { simplex->idxCount = lambdas[2] == 0.0f ? 2 : 3; }
-		if (simplex->idxCount == 2) { simplex->idxCount = lambdas[1] == 0.0f ? 1 : 2; }
 		break;
 	default:
 		exit(-1);
@@ -816,6 +809,19 @@ static bool GjkIntersectionTest(
 			break;
 		}
 
+		// sort by lamdas
+		int8_t last = simplex.idxCount - 1;
+		for (int8_t i = simplex.idxCount - 2; i >= 0; i--)
+		{
+			if (lambdas[i] == 0.0f)
+			{
+				simplex.SwapSupports(i, last);
+				last--;
+			}
+		}
+		simplex.idxCount = last + 1;
+
+
 		closestDistSq = newDistSq;
 		hasOrigin = simplex.idxCount == 4;
 		iterCount++;
@@ -826,7 +832,6 @@ static bool GjkIntersectionTest(
 		return false;
 	}
 
-	//GjkIntersectionTest(bodyA, bodyB, contact, bias);
 	// if simplex is not Tetrahedron build it
 	if (simplex.idxCount == 1)
 	{
