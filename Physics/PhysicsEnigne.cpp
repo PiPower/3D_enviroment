@@ -87,12 +87,12 @@ void PhysicsEnigne::ResolveContact(
 	Body* bodyB= contact->bodyB;
 
 	float totalMassInv = 1.0f/(bodyA->massInv + bodyB->massInv);
+	float elastictyFactor =  (1.0f + bodyA->elasticity * bodyB->elasticity) / 2.0f;
 
 	XMVECTOR I_A = totalMassInv * (XMLoadFloat3(&bodyB->linVelocity) - XMLoadFloat3(&bodyA->linVelocity));
 	XMVECTOR I_B = -I_A;
-	XMVECTOR totalImpulse = I_A - I_B;
-	XMVECTOR closingSpeed = XMVector3Dot(I_A - I_B, XMLoadFloat3(&contact->normal));
-	XMVECTOR yolo = -2.0f * XMVector3Dot(XMLoadFloat3(&bodyA->linVelocity) - XMLoadFloat3(&bodyB->linVelocity), XMLoadFloat3(&contact->normal)) / (bodyA->massInv + bodyB->massInv);
+	XMVECTOR totalImpulse = elastictyFactor * (I_A - I_B);
+	XMVECTOR closingSpeed = XMVector3Dot(totalImpulse, XMLoadFloat3(&contact->normal));
 	XMVECTOR reboundImpulse = XMLoadFloat3(&contact->normal) * closingSpeed;
 
 	XMFLOAT3 ImpulseStorage;
@@ -104,13 +104,12 @@ void PhysicsEnigne::ResolveContact(
 
 
 	// projecting bodies outside of eachother
-	if (contact->timeOfImpact == 0.0f)
-	{
-		XMVECTOR dist = XMLoadFloat3(&contact->ptOnB) - XMLoadFloat3(&contact->ptOnA);
 
-		XMStoreFloat3(&bodyA->position, XMLoadFloat3(&bodyA->position) + dist * bodyA->massInv / totalMassInv);
-		XMStoreFloat3(&bodyB->position, XMLoadFloat3(&bodyB->position) + dist * bodyB->massInv / totalMassInv);
-	}
+	XMVECTOR dist = XMLoadFloat3(&contact->ptOnB) - XMLoadFloat3(&contact->ptOnA);
+
+	XMStoreFloat3(&bodyA->position, XMLoadFloat3(&bodyA->position) + dist * bodyA->massInv / totalMassInv);
+	XMStoreFloat3(&bodyB->position, XMLoadFloat3(&bodyB->position) + dist * bodyB->massInv / totalMassInv);
+	
 }
 
 int64_t PhysicsEnigne::AddBody(
@@ -127,6 +126,7 @@ int64_t PhysicsEnigne::AddBody(
 	body.massInv = props.massInv;
 	body.position = props.position;
 	body.rotation = props.rotation;
+	body.elasticity = props.elasticity;
 	body.shape = CreateDefaultShape(shapeType, scales);
 
 	if (isDynamic)

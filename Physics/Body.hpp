@@ -14,6 +14,7 @@ struct BodyProperties
 	DirectX::XMFLOAT3 rotation;
 	DirectX::XMFLOAT3 angVelocity;
 	float massInv;
+	float elasticity;
 };
 
 struct Body
@@ -23,6 +24,7 @@ struct Body
 	DirectX::XMFLOAT3 rotation;
 	DirectX::XMFLOAT3 angVelocity;
 	float massInv;
+	float elasticity;
 
 	Shape shape;
 
