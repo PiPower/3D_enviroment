@@ -763,7 +763,7 @@ static VkSwapchainKHR createSwapchain(
 	}
 	if (i == swapchainInfo.formats.size())
 	{
-		MessageBox(NULL, L"Unsupported VK_FORMAT_B8G8R8A8_SRGB! \n", NULL, MB_OK);
+		MessageBox(NULL, L"Unsupported VK_FORMAT_R8G8B8A8_UNORM! \n", NULL, MB_OK);
 		exit(-1);
 	}
 

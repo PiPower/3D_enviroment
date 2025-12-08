@@ -73,10 +73,11 @@ Shape PhysicsEnigne::CreateDefaultShape(
 	switch (type)
 	{
 	case ShapeType::OrientedBox:
-		GetDefaultBoxShape(scales);
+		return GetDefaultBoxShape(scales);
 		break;
 	default:
 		exit(-1);
+		break;
 	};
 }
 
