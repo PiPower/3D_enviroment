@@ -12,9 +12,17 @@ struct VulkanPipelineData
 	std::vector<VkDescriptorSet> sets;
 	VkDescriptorPool descriptorPool;
 	size_t boundPoolId;
-	size_t boundCameraUboId;
+	size_t boundGlobalUboId;
 	uint32_t maxSets;
+	uint8_t lightCount;
 };
+
+struct Light
+{
+	DirectX::XMFLOAT4 color; // (R, G, B, Intensity)
+	DirectX::XMFLOAT4 pos;   // (x, y, z, unused)
+};
+
 
 struct RenderItem
 {

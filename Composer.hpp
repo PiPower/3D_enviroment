@@ -18,7 +18,8 @@ struct Composer
 {
 	Composer(
 		Renderer* renderer,
-		PhysicsEnigne* physicsEngine);
+		PhysicsEnigne* physicsEngine,
+		const std::vector<Light>& lights);
 
 	void RenderScene();
 
@@ -46,9 +47,9 @@ public:
 	std::vector<ObjectUbo> physicsEntitiesTrsfm;
 	std::vector<RenderItem> renderEntities;
 	// ----- camera related -----
-	uint64_t cameraUbo;
-	Camera cameraBuffer;
+	uint64_t globalUbo;
 	CameraOrientation camOrientation;
-
+	std::vector<Light> lights;
+	char* globalUboBuffer;
 };
 

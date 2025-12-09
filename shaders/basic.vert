@@ -1,11 +1,21 @@
 #version 450
+#ifndef LIGHT_COUNT
+    #define LIGHT_COUNT
+#endif
 
 
-layout(binding = 0) uniform CameraUbo
+struct Light
+{
+    vec4 color; // (R, G, B, Intensity)
+    vec4 pos;   // (x, y, z, unused)
+};
+
+layout(binding = 0) uniform Globals
 {
     mat4 view;
     mat4 proj;
-} cameraTransform;
+    Light lights[LIGHT_COUNT]; // (R, G, B, Intensity);
+} global;
 
 layout(binding = 1) uniform  ObjectTransform
 {
@@ -25,7 +35,7 @@ layout(location = 2) out vec4 worldPos;
 void main() 
 {
     worldPos = objectTransform.model * vec4(inPosition, 1.0);
-    gl_Position = cameraTransform.proj * cameraTransform.view * worldPos;
+    gl_Position = global.proj * global.view * worldPos;
     faceNormal =  transpose(inverse(mat3(objectTransform.model))) * inNormal;
     texCoord = inTex;
 }

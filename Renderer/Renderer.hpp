@@ -3,7 +3,7 @@
 #include "ShaderCompiler.hpp"
 #include "GraphicsTypes.hpp"
 #define VULKAN_RENDERER_ERROR 0xFFFFFFFFFFFFFFFF;
-#define UBO_CAMERA_RESOURCE_TYPE 1
+#define UBO_GLOBAL_RESOURCE_TYPE 1
 #define UBO_OBJ_TRSF_RESOURCE_TYPE 2
 
 enum class PipelineTypes
@@ -19,6 +19,7 @@ public:
 	Renderer(
 		HINSTANCE hinstance, 
 		HWND hwnd,
+		uint8_t lightCount,
 		VkDeviceSize stagingSize = 1'000'000);
 
 	void BeginRendering();
@@ -45,7 +46,8 @@ public:
 	int64_t BindUboPoolToPipeline(
 		uint64_t pipelineId,
 		uint64_t uboPoolId,
-		uint64_t cameraUboId);
+		uint64_t globalUboId);
+
 
 	void Render(
 		uint64_t meshCollectionId,
@@ -68,7 +70,8 @@ private:
 	void CreateComputeLayout();
 	void CreatePipelinePools();
 	void CreateBasicGraphicsLayout();
-	void CreateBasicGraphicsPipelines();
+	void CreateBasicGraphicsPipelines(
+		uint8_t lightCount);
 	void CreateGraphicsSets();
 	void UpdateComputeSets();
 private:

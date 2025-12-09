@@ -10,20 +10,27 @@ static constexpr XMFLOAT3 upInitial = { 0.0f, 1.0f, 0.0f };
 
 Composer::Composer(
     Renderer* renderer,
-    PhysicsEnigne* physicsEngine)
+    PhysicsEnigne* physicsEngine,
+    const std::vector<Light>& lights)
     :
     cameraAngleX(0), cameraAngleY(0), camOrientation(eyeInitial, upInitial, lookDirInitial), 
-    renderer(renderer) , physicsEngine(physicsEngine), calculatePhysics(true), frameMode(false)
+    renderer(renderer) , physicsEngine(physicsEngine), calculatePhysics(true), frameMode(false),
+    lights(lights)
 {
     vector<GeometryEntry> boxGeo({ GeometryType::Box });
     renderer->CreateMeshCollection(boxGeo, &boxCollection);
-    renderer->CreateUboPool(sizeof(Camera), sizeof(ObjectUbo), 300'000, &uboPool);
-    renderer->AllocateUboResource(uboPool, UBO_CAMERA_RESOURCE_TYPE, &cameraUbo);
-    renderer->BindUboPoolToPipeline((uint64_t)PipelineTypes::Graphics, uboPool, cameraUbo);
+    renderer->CreateUboPool(sizeof(Camera) + lights.size() * sizeof(Light), sizeof(ObjectUbo), 300'000, &uboPool);
+    renderer->AllocateUboResource(uboPool, UBO_GLOBAL_RESOURCE_TYPE, &globalUbo);
+    renderer->BindUboPoolToPipeline((uint64_t)PipelineTypes::Graphics, uboPool, globalUbo);
 
+    globalUboBuffer = new char[sizeof(Camera) + lights.size() * sizeof(Light)];
+    memcpy(globalUboBuffer + sizeof(Camera), lights.data(), lights.size() * sizeof(Light));
 
-    XMStoreFloat4x4(&cameraBuffer.proj, XMMatrixPerspectiveFovLH(3.14f / 4.0f, 1600.0f / 900.0f, 0.1f, 128.0f));
-    cameraBuffer.proj._22 *= -1.0f;// vulkan has -1.0f on top and 1.0f on bottom
+    XMFLOAT4X4 proj;
+    XMStoreFloat4x4(&proj, XMMatrixPerspectiveFovLH(3.14f / 4.0f, 1600.0f / 900.0f, 0.1f, 128.0f));
+    proj._22 *= -1.0f;// vulkan has -1.0f on top and 1.0f on bottom
+
+    memcpy(globalUboBuffer + sizeof(XMFLOAT4X4), &proj, sizeof(XMFLOAT4X4));
 
     GenerateObjects();
 }
@@ -42,8 +49,11 @@ void Composer::UpdateCamera()
     XMVECTOR eyePos = XMLoadFloat3(&camOrientation.eye);
     XMVECTOR lookAt = XMLoadFloat3(&camOrientation.lookDir);
     XMVECTOR up = XMLoadFloat3(&camOrientation.up);
-    XMStoreFloat4x4(&cameraBuffer.view, XMMatrixLookToLH(eyePos, lookAt, up));
-    renderer->UpdateUboMemory(uboPool, cameraUbo, (char*)&cameraBuffer);
+    XMFLOAT4X4 view;
+    XMStoreFloat4x4(&view, XMMatrixLookToLH(eyePos, lookAt, up));
+    memcpy(globalUboBuffer, &view, sizeof(XMFLOAT4X4));
+
+    renderer->UpdateUboMemory(uboPool, globalUbo, globalUboBuffer);
 }
 
 void Composer::GenerateObjects()

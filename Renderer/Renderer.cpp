@@ -21,12 +21,12 @@ static constexpr uint32_t CL_STORAGE_IMAGES = static_cast<uint32_t>(ComputeLayou
 
 enum class GraphicsLayout
 {
-    CameraUbo = 0,
+    GlobalUbo = 0,
     ObjectUbo,
     GfxEntryCount
 };
 
-static constexpr uint32_t GFX_CAMERA_UBO = static_cast<uint32_t>(GraphicsLayout::CameraUbo);
+static constexpr uint32_t GFX_CAMERA_UBO = static_cast<uint32_t>(GraphicsLayout::GlobalUbo);
 static constexpr uint32_t GFX_OBJECT_UBO = static_cast<uint32_t>(GraphicsLayout::ObjectUbo);
 static constexpr uint32_t GFX_ENTRY_COUNT = static_cast<uint32_t>(GraphicsLayout::GfxEntryCount);
 
@@ -38,6 +38,7 @@ const Geometry* baseShapesTable[]
 Renderer::Renderer(
     HINSTANCE hinstance,
     HWND hwnd,
+    uint8_t lightCount,
     VkDeviceSize stagingSize)
 	:
 	windowHwnd(hwnd), compiler(), pipelines(3), maxUboPoolSize(65536)
@@ -51,7 +52,7 @@ Renderer::Renderer(
     CreateComputeLayout();
     CreateComputePipeline();
     CreateBasicGraphicsLayout();
-    CreateBasicGraphicsPipelines();
+    CreateBasicGraphicsPipelines(lightCount);
     CreatePipelinePools();
     UpdateComputeSets();
     CreateGraphicsSets();
@@ -191,7 +192,7 @@ int64_t Renderer::AllocateUboResource(
 int64_t Renderer::BindUboPoolToPipeline(
     uint64_t pipelineId,
     uint64_t uboPoolId,
-    uint64_t cameraUboId)
+    uint64_t globalUboId)
 {
     if (pipelineId > pipelines.size())
     {
@@ -209,10 +210,10 @@ int64_t Renderer::BindUboPoolToPipeline(
 
     VulkanPipelineData* pipelineData = &pipelines[pipelineId];
     UboPoolEntry* uboPoolEntry = &uboPoolEntries[uboPoolId - 1];
-    UboEntry* camUbo = &uboPoolEntry->uboEntries[cameraUboId - 1];
+    UboEntry* camUbo = &uboPoolEntry->uboEntries[globalUboId - 1];
 
     pipelineData->boundPoolId = uboPoolId;
-    pipelineData->boundCameraUboId = cameraUboId;
+    pipelineData->boundGlobalUboId = globalUboId;
 
     for (size_t i = 0; i < uboPoolEntries[uboPoolId - 1].uboPool.boundBuffers.size(); i++)
     {
@@ -263,7 +264,7 @@ void Renderer::Render(
 
     for (size_t i = 0; i < renderItems.size(); i++)
     {
-        uint32_t setDynamicRange[2] = { uboPool->uboEntries[pipelines[pipelineId].boundCameraUboId - 1].bufferOffset, 
+        uint32_t setDynamicRange[2] = { uboPool->uboEntries[pipelines[pipelineId].boundGlobalUboId - 1].bufferOffset, 
                                         uboPool->uboEntries[renderItems[i].transformUboId - 1].bufferOffset};
         vkCmdBindDescriptorSets(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines[pipelineId].pipelineLayout,
             uboPool->uboEntries[renderItems[i].transformUboId - 1].bufferIdx, 1, pipelines[pipelineId].sets.data(), 2, setDynamicRange);
@@ -691,8 +692,12 @@ void Renderer::CreateBasicGraphicsLayout()
     EXIT_ON_VK_ERROR(vkCreatePipelineLayout(vkResources.device, &layoutInfoGraphicsNonFill, nullptr, &GET_PIPELINE(PipelineTypes::GraphicsNonFill).pipelineLayout));
 }
 
-void Renderer::CreateBasicGraphicsPipelines()
+void Renderer::CreateBasicGraphicsPipelines(
+    uint8_t lightCount)
 {
+    ShaderOptions opts;
+    string strLightCount = to_string(lightCount);
+    opts.AddOption("LIGHT_COUNT", strLightCount.c_str());
     VkShaderModule vertexShader = compiler.CompileShaderFromPath(vkResources.device, nullptr, "shaders/basic.vert", "main", shaderc_vertex_shader, {});
     VkShaderModule fragmentShader = compiler.CompileShaderFromPath(vkResources.device, nullptr, "shaders/basic.frag", "main", shaderc_fragment_shader, {});
 
@@ -827,12 +832,13 @@ void Renderer::CreateBasicGraphicsPipelines()
 
     EXIT_ON_VK_ERROR(vkCreateGraphicsPipelines(vkResources.device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, 
                                                                 &GET_PIPELINE(PipelineTypes::Graphics).pipeline));
-
+    GET_PIPELINE(PipelineTypes::Graphics).lightCount = lightCount;
     rasterInfo.polygonMode = VK_POLYGON_MODE_LINE;
     pipelineInfo.layout = GET_PIPELINE(PipelineTypes::GraphicsNonFill).pipelineLayout;
+
     EXIT_ON_VK_ERROR(vkCreateGraphicsPipelines(vkResources.device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, 
                                                         &GET_PIPELINE(PipelineTypes::GraphicsNonFill).pipeline));
-
+    GET_PIPELINE(PipelineTypes::GraphicsNonFill).lightCount = lightCount;
 
     vkDestroyShaderModule(vkResources.device, fragmentShader, nullptr);
     vkDestroyShaderModule(vkResources.device, vertexShader, nullptr);

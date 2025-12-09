@@ -8,6 +8,12 @@ struct ShaderOptions
 {
 	std::vector<std::string> name;
 	std::vector<std::string> value;
+
+	void AddOption(const char* optName, const char* optValue)
+	{
+		name.push_back(optName);
+		value.push_back(optValue);
+	}
 };
 
 class ShaderCompiler
