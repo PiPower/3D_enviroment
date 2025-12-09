@@ -8,7 +8,7 @@
 struct Light
 {
     vec4 color; // (R, G, B, Intensity)
-    vec4 pos;   // (x, y, z, unused)
+    vec4 pos;   // (x, y, z, Ambient factor)
 };
 
 layout(binding = 0) uniform Globals
@@ -33,8 +33,12 @@ layout(location = 2) in vec4 worldPos;
 layout(location = 0) out vec4 outColor;
 void main()
 {
-    outColor = objectTransform.color;
-    outColor.xyz = outColor.xyz * global.lights[0].color.xyz;
-    outColor.rgb = pow(outColor.rgb, vec3(1.0/GAMMA_F));
+    vec3 lightVec = normalize(global.lights[0].pos.xyz - worldPos.xyz);
+    float diffCoeff = max(dot(normalize(faceNormal), lightVec), 0.0);
+    vec3 diffuseLight = diffCoeff * global.lights[0].color.rgb;
+    vec3 ambientLight = global.lights[0].pos.w * global.lights[0].color.rgb;
 
+    outColor = objectTransform.color;
+    outColor.rgb = (diffuseLight + ambientLight) * outColor.rgb;
+    outColor.rgb = pow(outColor.rgb, vec3(1.0/GAMMA_F));
 }

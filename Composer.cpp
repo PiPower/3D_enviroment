@@ -4,7 +4,7 @@
 using namespace DirectX;
 using namespace std;
 
-static constexpr XMFLOAT3 eyeInitial = { -6.0f, 9.0f, -35.0f };
+static constexpr XMFLOAT3 eyeInitial = { -0.0f, 9.0f, -0.0f };
 static constexpr XMFLOAT3 lookDirInitial = { 0.0f, 0.0f, 1.0f };
 static constexpr XMFLOAT3 upInitial = { 0.0f, 1.0f, 0.0f };
 
