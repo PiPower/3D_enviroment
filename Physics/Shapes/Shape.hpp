@@ -16,10 +16,16 @@ typedef void(*SupportFunction)(
 	DirectX::XMFLOAT3* supportVec, 
 	float bias);
 
+// dir MUST BE normalized to 1
+typedef void(*GetInverseInertiaTensor)(
+	const Shape* shape,
+	float invMass,
+	DirectX::XMFLOAT4X4* inertiaTensor);
 
 struct Shape
 {
 	GetTrasformationMatrix getTrasformationMatrix;
 	SupportFunction supportFunction;
+	GetInverseInertiaTensor getInverseInertiaTensor;
 	char* shapeData;
 };

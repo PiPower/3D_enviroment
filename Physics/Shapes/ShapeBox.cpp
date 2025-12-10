@@ -1,5 +1,5 @@
 #include "ShapeBox.hpp"
-
+#include <cstring>
 using namespace DirectX;
 
 /*
@@ -62,6 +62,20 @@ static void SupportFn(
 	}
 	XMStoreFloat3(supportVec, XMLoadFloat3(supportVec) + XMVector3Normalize(dirVec) * bias);
 }
+
+static void GetInverseInertiaTensorBox(
+	const Shape* shape,
+	float invMass,
+	DirectX::XMFLOAT4X4* inertiaTensor)
+{
+	Box* box = (Box*)shape->shapeData;
+	memset(inertiaTensor, 0, sizeof(XMFLOAT4X4));
+	inertiaTensor->_11 = 12.0f * invMass * 1 / (box->scales.y * box->scales.y + box->scales.z * box->scales.z);
+	inertiaTensor->_22 = 12.0f * invMass * 1 / (box->scales.x * box->scales.x + box->scales.z * box->scales.z);
+	inertiaTensor->_33 = 12.0f * invMass * 1 / (box->scales.y * box->scales.y + box->scales.x * box->scales.x);
+}
+
+
 Shape GetDefaultBoxShape(
 	DirectX::XMFLOAT3 scales)
 {
@@ -69,6 +83,7 @@ Shape GetDefaultBoxShape(
 
 	boxShape.getTrasformationMatrix = TransformationMatrix;
 	boxShape.supportFunction = SupportFn;
+	boxShape.getInverseInertiaTensor = GetInverseInertiaTensorBox;
 
 	Box* box = new Box();
 	box->scales = scales;
