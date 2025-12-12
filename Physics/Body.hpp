@@ -11,7 +11,7 @@ struct BodyProperties
 {
 	DirectX::XMFLOAT3 position;
 	DirectX::XMFLOAT3 linVelocity;
-	DirectX::XMFLOAT3 rotation;
+	DirectX::XMFLOAT4 rotation;
 	DirectX::XMFLOAT3 angVelocity;
 	float massInv;
 	float elasticity;
