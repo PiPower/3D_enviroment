@@ -73,17 +73,38 @@ static void GetInverseInertiaTensorBox(
 	inertiaTensor->_11 = 12.0f * invMass * 1 / (box->scales.y * box->scales.y + box->scales.z * box->scales.z);
 	inertiaTensor->_22 = 12.0f * invMass * 1 / (box->scales.x * box->scales.x + box->scales.z * box->scales.z);
 	inertiaTensor->_33 = 12.0f * invMass * 1 / (box->scales.y * box->scales.y + box->scales.x * box->scales.x);
+	inertiaTensor->_44 = 1.0f;
 }
 
+static void GetInverseInertiaTensorWorldSpaceBox(
+	const Shape* shape,
+	float invMass,
+	const DirectX::XMFLOAT4* rotationQuat,
+	DirectX::XMFLOAT4X4* inertiaTensor)
+{
+	shape->getInverseInertiaTensor(shape, invMass, inertiaTensor);
+	XMMATRIX tensor = XMLoadFloat4x4(inertiaTensor);
+	XMMATRIX rotationMat = XMMatrixRotationQuaternion(XMLoadFloat4(rotationQuat));
+	tensor = rotationMat * tensor * XMMatrixTranspose(rotationMat);
+	XMStoreFloat4x4(inertiaTensor, tensor);
+}
+
+static void GetCenterOfMassBox(
+	const Shape* shape,
+	XMFLOAT3* CoM)
+{
+
+}
 
 Shape GetDefaultBoxShape(
 	DirectX::XMFLOAT3 scales)
 {
 	Shape boxShape;
-
 	boxShape.getTrasformationMatrix = TransformationMatrix;
 	boxShape.supportFunction = SupportFn;
 	boxShape.getInverseInertiaTensor = GetInverseInertiaTensorBox;
+	boxShape.getInverseInertiaTensorWorldSpace = GetInverseInertiaTensorWorldSpaceBox;
+	boxShape.getCenterOfMass = GetCenterOfMassBox;
 
 	Box* box = new Box();
 	box->scales = scales;

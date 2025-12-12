@@ -22,10 +22,22 @@ typedef void(*GetInverseInertiaTensor)(
 	float invMass,
 	DirectX::XMFLOAT4X4* inertiaTensor);
 
+typedef void(*GetInverseInertiaTensorWorldSpace)(
+	const Shape* shape,
+	float invMass,
+	const DirectX::XMFLOAT4* rotationQuat,
+	DirectX::XMFLOAT4X4* inertiaTensor);
+
+typedef void(*GetCenterOfMass)(
+	const Shape* shape,
+	DirectX::XMFLOAT3* CoM);
+
 struct Shape
 {
 	GetTrasformationMatrix getTrasformationMatrix;
 	SupportFunction supportFunction;
 	GetInverseInertiaTensor getInverseInertiaTensor;
+	GetInverseInertiaTensorWorldSpace getInverseInertiaTensorWorldSpace;
+	GetCenterOfMass getCenterOfMass;
 	char* shapeData;
 };

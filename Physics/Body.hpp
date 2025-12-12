@@ -20,11 +20,11 @@ struct BodyProperties
 struct Body
 {
 	DirectX::XMFLOAT3 position;
-	DirectX::XMFLOAT3 linVelocity;
-	DirectX::XMFLOAT3 rotation;
-	DirectX::XMFLOAT3 angVelocity;
-	float massInv;
 	float elasticity;
+	DirectX::XMFLOAT3 linVelocity;
+	float massInv;
+	DirectX::XMFLOAT4 rotation;
+	DirectX::XMFLOAT3 angVelocity;
 
 	Shape shape;
 
@@ -33,5 +33,8 @@ struct Body
 
 	void ApplyLinearImpulse(
 		DirectX::XMFLOAT3* Impulse);
+
+	void GetCenterOfMass(
+		DirectX::XMFLOAT3* centerOfMass);
 };
 
