@@ -32,9 +32,16 @@ struct Body
 		float dt);
 
 	void ApplyLinearImpulse(
-		DirectX::XMFLOAT3* Impulse);
+		const DirectX::XMFLOAT3* Impulse);
 
-	void GetCenterOfMass(
+	void ApplyAngularImpulse(
+		const DirectX::XMFLOAT3* Impulse);
+
+	void ApplyImpulse(
+		const DirectX::XMFLOAT3* contactPoint,
+		const DirectX::XMFLOAT3* Impulse);
+
+	void GetCenterOfMassWorldSpace(
 		DirectX::XMFLOAT3* centerOfMass);
 };
 

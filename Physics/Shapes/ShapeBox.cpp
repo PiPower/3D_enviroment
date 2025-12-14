@@ -37,6 +37,7 @@ static void SupportFn(
 	const Shape* shape,
 	const DirectX::XMFLOAT3* pos,
 	const DirectX::XMFLOAT3* dir, 
+	const DirectX::XMFLOAT4* rotQuat,
 	DirectX::XMFLOAT3* supportVec, 
 	float bias)
 {
@@ -44,6 +45,8 @@ static void SupportFn(
 
 	XMVECTOR dirVec = XMLoadFloat3(dir);
 	XMVECTOR posVec = XMLoadFloat3(pos);
+	XMVECTOR rotationQuat = XMLoadFloat4(rotQuat);
+	XMMATRIX rotMat = XMMatrixRotationQuaternion(rotationQuat);
 	XMVECTOR vert = XMLoadFloat3(&box->vertecies[0]) + posVec;
 	XMStoreFloat3(supportVec, vert);
 
@@ -51,7 +54,8 @@ static void SupportFn(
 	XMStoreFloat(&maxProd, XMVector3Dot(vert, dirVec));
 	for (uint8_t i = 1; i < 8; i++)
 	{
-		vert = XMLoadFloat3(&box->vertecies[i]) + posVec;
+		vert = XMVector3Transform(XMLoadFloat3(&box->vertecies[i]), rotMat);
+		vert = vert + posVec;
 		float prod;
 		XMStoreFloat(&prod, XMVector3Dot(vert, dirVec));
 		if (prod > maxProd)
@@ -70,9 +74,13 @@ static void GetInverseInertiaTensorBox(
 {
 	Box* box = (Box*)shape->shapeData;
 	memset(inertiaTensor, 0, sizeof(XMFLOAT4X4));
-	inertiaTensor->_11 = 12.0f * invMass * 1 / (box->scales.y * box->scales.y + box->scales.z * box->scales.z);
-	inertiaTensor->_22 = 12.0f * invMass * 1 / (box->scales.x * box->scales.x + box->scales.z * box->scales.z);
-	inertiaTensor->_33 = 12.0f * invMass * 1 / (box->scales.y * box->scales.y + box->scales.x * box->scales.x);
+	const float dy = 2.0f * box->scales.y;
+	const float dx = 2.0f * box->scales.x;
+	const float dz = 2.0f * box->scales.y;
+
+	inertiaTensor->_11 = 12.0f * invMass * 1 / (dy * dy + dz * dz);
+	inertiaTensor->_22 = 12.0f * invMass * 1 / (dx * dx + dz * dz);
+	inertiaTensor->_33 = 12.0f * invMass * 1 / (dy * dy + dx * dx);
 	inertiaTensor->_44 = 1.0f;
 }
 
@@ -89,11 +97,30 @@ static void GetInverseInertiaTensorWorldSpaceBox(
 	XMStoreFloat4x4(inertiaTensor, tensor);
 }
 
+static void GetPartialInertiaTensorBox(
+	const Shape* shape,
+	DirectX::XMFLOAT4X4* inertiaTensor)
+{
+	Box* box = (Box*)shape->shapeData;
+	memset(inertiaTensor, 0, sizeof(XMFLOAT4X4));
+
+	const float dy = 2.0f * box->scales.y;
+	const float dx = 2.0f * box->scales.x;
+	const float dz = 2.0f * box->scales.y;
+
+	inertiaTensor->_11 = (dy * dy + dz * dz)/12.0f;
+	inertiaTensor->_22 = (dx * dx +	dz * dz)/12.0f;
+	inertiaTensor->_33 = (dy * dy + dx * dx)/12.0f;
+	inertiaTensor->_44 = 1.0f;
+}
+
 static void GetCenterOfMassBox(
 	const Shape* shape,
 	XMFLOAT3* CoM)
 {
-
+	CoM->x = 0;
+	CoM->y = 0;
+	CoM->z = 0;
 }
 
 Shape GetDefaultBoxShape(
@@ -105,7 +132,7 @@ Shape GetDefaultBoxShape(
 	boxShape.getInverseInertiaTensor = GetInverseInertiaTensorBox;
 	boxShape.getInverseInertiaTensorWorldSpace = GetInverseInertiaTensorWorldSpaceBox;
 	boxShape.getCenterOfMass = GetCenterOfMassBox;
-
+	boxShape.getPartialInertiaTensor = GetPartialInertiaTensorBox;
 	Box* box = new Box();
 	box->scales = scales;
 

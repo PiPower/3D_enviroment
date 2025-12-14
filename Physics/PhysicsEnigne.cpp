@@ -3,7 +3,6 @@
 #include <inttypes.h>
 #include "Intersection.hpp"
 #include <algorithm>
-
 using namespace std;
 using namespace DirectX;
 
@@ -154,8 +153,11 @@ int64_t PhysicsEnigne::GetTransformMatrixForBody(
 {
 	const Body* body = GetBody(bodyId);
 	body->shape.getTrasformationMatrix(body->shape.shapeData, mat);
-	XMMATRIX transform = XMLoadFloat4x4(mat);
-	transform = transform * XMMatrixTranslation(body->position.x, body->position.y, body->position.z);
+
+	XMMATRIX transform = XMLoadFloat4x4(mat) *
+						 XMMatrixRotationQuaternion(XMLoadFloat4(&body->rotation)) *
+						 XMMatrixTranslation(body->position.x, body->position.y, body->position.z);
+
 	XMStoreFloat4x4(mat, transform);
 	return 0;
 }

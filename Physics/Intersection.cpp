@@ -83,6 +83,8 @@ static void GetSupport(
 	const Body* bodyA,
 	const Body* bodyB,
 	const XMFLOAT3* dir,
+	const XMFLOAT4* rotQuatA,
+	const XMFLOAT4* rotQuatB,
 	XMFLOAT3* support,
 	XMFLOAT3* ptOnA,
 	XMFLOAT3* ptOnB,
@@ -90,8 +92,8 @@ static void GetSupport(
 {
 	XMFLOAT3 negateDir = { dir->x * -1.0f, dir->y * -1.0f, dir->z * -1.0f };
 
-	bodyA->shape.supportFunction(&bodyA->shape, &bodyA->position, dir, ptOnA, bias);
-	bodyB->shape.supportFunction(&bodyB->shape, &bodyB->position, &negateDir, ptOnB, bias);
+	bodyA->shape.supportFunction(&bodyA->shape, &bodyA->position, dir, rotQuatA, ptOnA, bias);
+	bodyB->shape.supportFunction(&bodyB->shape, &bodyB->position, &negateDir, rotQuatB, ptOnB, bias);
 
 	XMVECTOR VecSupportA = XMLoadFloat3(ptOnA);
 	XMVECTOR VecSupportB = XMLoadFloat3(ptOnB);
@@ -107,7 +109,8 @@ static void GetSupport(
 	SupportPoint* supportPoint,
 	float bias)
 {
-	return GetSupport(bodyA, bodyB, dir, &supportPoint->ptOnSimplex, &supportPoint->ptOnA, &supportPoint->ptOnB, bias);
+	return GetSupport(bodyA, bodyB, dir, &bodyA->rotation, &bodyB->rotation, 
+			&supportPoint->ptOnSimplex, &supportPoint->ptOnA, &supportPoint->ptOnB, bias);
 }
 
 static float SignedDistanceToSurface(
