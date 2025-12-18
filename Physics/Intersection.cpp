@@ -122,7 +122,7 @@ static float SignedDistanceToSurface(
 	XMVECTOR vec10 = XMLoadFloat3(p1) - XMLoadFloat3(p0);
 	XMVECTOR vec20 = XMLoadFloat3(p2) - XMLoadFloat3(p0);
 	XMVECTOR vecP0 = XMLoadFloat3(point) - XMLoadFloat3(p0);
-	XMVECTOR n = XMVector3Cross(vec10, vec20);
+	XMVECTOR n = XMVector3Cross(vec20, vec10);
 	n = XMVector3Normalize(n);
 
 	float dist;
@@ -409,8 +409,9 @@ static float EpaContactInfo(
 		const Triangle& tri = triangles[idx];
 		XMVECTOR vecBA = XMLoadFloat3(&points[tri.b].ptOnSimplex) - XMLoadFloat3(&points[tri.a].ptOnSimplex);
 		XMVECTOR vecCA = XMLoadFloat3(&points[tri.c].ptOnSimplex) - XMLoadFloat3(&points[tri.a].ptOnSimplex);
-		XMVECTOR n = XMVector3Cross(vecBA, vecCA);
-		XMStoreFloat3(&normal, XMVector3Normalize(n));
+		XMVECTOR n = XMVector3Cross(vecCA, vecBA);
+		n = XMVector3Normalize(n);
+		XMStoreFloat3(&normal, n);
 		GetSupport(bodyA, bodyB, &normal, &suppPoint, bias);
 
 		if (HasPoint(suppPoint, triangles, points))
@@ -425,16 +426,7 @@ static float EpaContactInfo(
 		}
 
 		points.push_back(suppPoint);
-#ifdef _DEBUG
-		// temporary to check if all 4 vertecies create 2D plane
-		vector<Triangle> tr2 = triangles;
-		RemoveTrianglesFacingPoint(&tr2, points, suppPoint);
-		if (tr2.size() == 0)
-		{
-			int x = 2;
-			EpaContactInfo(bodyA, bodyB, bias, simplexPoints, ptOnA,ptOnB);
-		}
-#endif // DEBUG
+
 		size_t numRemoved = RemoveTrianglesFacingPoint(&triangles, points, suppPoint);
 		if (0 == numRemoved) 
 		{
@@ -926,11 +918,12 @@ bool CheckIntersection(
 	{
 		if (GjkIntersectionTest(bodyA, bodyB, contact, 0.001))
 		{
-			auto z = XMLoadFloat3(&contact->ptOnB) - XMLoadFloat3(&contact->ptOnA);
 			XMStoreFloat3(&contact->normal,
 				XMVector3Normalize(XMLoadFloat3(&contact->ptOnB) - XMLoadFloat3(&contact->ptOnA))
 			);
 
+			bodyA->GetPointInLocalSpace(&contact->ptOnA, &contact->localPtOnA);
+			bodyB->GetPointInLocalSpace(&contact->ptOnB, &contact->localPtOnB);
 			contact->timeOfImpact = total_time;
 			contact->bodyA = bodyA;
 			contact->bodyB = bodyB;

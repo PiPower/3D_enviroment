@@ -13,15 +13,13 @@ struct PhysicsEnigne
 		DirectX::XMFLOAT3 scales,
 		bool isDynamic, 
 		uint64_t* bodyId,
-		DirectX::XMFLOAT3 constForce = {0, -2.8, 0});
+		DirectX::XMFLOAT3 constForce = {0, -9.8, 0});
 	
 	int64_t GetTransformMatrixForBody(
 		uint64_t bodyId,
 		DirectX::XMFLOAT4X4* mat);
 
 	int64_t UpdateBodies(float dt);
-
-private:
 
 	int64_t FindIntersections(
 		float dt);
@@ -37,7 +35,13 @@ private:
 		Contact* contact
 	);
 
-private:
+	void GetAngularImpulse(
+		const Body* body, 
+		const DirectX::XMFLOAT3* point,
+		const DirectX::XMFLOAT3* normal, 
+		DirectX::XMFLOAT3* Impulse);
+
+public:
 	std::vector<Body> staticBodies;
 	std::vector<DirectX::XMFLOAT3> constForces; // per dynamic body
 	std::vector<Body> dynamicBodies;

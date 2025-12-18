@@ -42,6 +42,13 @@ struct Body
 		const DirectX::XMFLOAT3* Impulse);
 
 	void GetCenterOfMassWorldSpace(
-		DirectX::XMFLOAT3* centerOfMass);
+		DirectX::XMFLOAT3* centerOfMass) const;
+
+	void GetPointInLocalSpace(
+		const DirectX::XMFLOAT3* point,
+		DirectX::XMFLOAT3* localSpacePoint) const;
+
+	void GetInverseInertiaTensorWorldSpace(
+		DirectX::XMFLOAT4X4* tensor) const;
 };
 

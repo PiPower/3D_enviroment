@@ -86,31 +86,69 @@ void PhysicsEnigne::ResolveContact(
 	Body* bodyA = contact->bodyA;
 	Body* bodyB= contact->bodyB;
 
-	float totalMassInv = 1.0f/(bodyA->massInv + bodyB->massInv);
-	float elastictyFactor =  (1.0f + bodyA->elasticity * bodyB->elasticity) / 2.0f;
+	float elastictyFactor =  bodyA->elasticity * bodyB->elasticity;
 
-	XMVECTOR I_A = totalMassInv * (XMLoadFloat3(&bodyB->linVelocity) - XMLoadFloat3(&bodyA->linVelocity));
-	XMVECTOR I_B = -I_A;
-	XMVECTOR totalImpulse = elastictyFactor * (I_A - I_B);
-	XMVECTOR closingSpeed = XMVector3Dot(totalImpulse, XMLoadFloat3(&contact->normal));
+	XMFLOAT3 angularImpulseA;
+	XMFLOAT3 angularImpulseB;
+	float angularFactor;
+	GetAngularImpulse(bodyA, &contact->ptOnA, &contact->normal, &angularImpulseA);
+	GetAngularImpulse(bodyB, &contact->ptOnB, &contact->normal, &angularImpulseB);
+	XMVECTOR totalAngularImpulse = XMLoadFloat3(&angularImpulseA) + XMLoadFloat3(&angularImpulseB);
+	XMStoreFloat(&angularFactor, XMVector3Dot(totalAngularImpulse, XMLoadFloat3(&contact->normal)));
+	float denominator = 1.0f / (bodyA->massInv + bodyB->massInv + angularFactor);
+
+	XMFLOAT3 CoM;
+	bodyA->GetCenterOfMassWorldSpace(&CoM);
+	XMVECTOR v_velA = XMLoadFloat3(&bodyA->linVelocity) + XMVector3Cross(XMLoadFloat3(&bodyA->angVelocity), XMLoadFloat3(&contact->ptOnA) - XMLoadFloat3(&CoM));
+	bodyB->GetCenterOfMassWorldSpace(&CoM);
+	XMVECTOR v_velB = XMLoadFloat3(&bodyB->linVelocity) + XMVector3Cross(XMLoadFloat3(&bodyB->angVelocity), XMLoadFloat3(&contact->ptOnB) - XMLoadFloat3(&CoM));
+	auto z = v_velA - v_velB;
+	XMVECTOR closingSpeed = denominator * (1 + elastictyFactor) * XMVector3Dot(v_velA - v_velB, XMLoadFloat3(&contact->normal));
 	XMVECTOR reboundImpulse = XMLoadFloat3(&contact->normal) * closingSpeed;
 
-	XMFLOAT3 ImpulseStorage;
-	XMStoreFloat3(&ImpulseStorage, reboundImpulse);
-	bodyA->ApplyLinearImpulse(&ImpulseStorage);
+	//XMVECTOR I_A = denominator * (XMLoadFloat3(&bodyB->linVelocity) - XMLoadFloat3(&bodyA->linVelocity));
+	//XMVECTOR I_B = -I_A;
+	//XMVECTOR totalImpulse = elastictyFactor * (I_A - I_B);
+	//XMVECTOR closingSpeed = XMVector3Dot(totalImpulse, XMLoadFloat3(&contact->normal));
+	//XMVECTOR reboundImpulse = XMLoadFloat3(&contact->normal) * closingSpeed;
 
-	XMStoreFloat3(&ImpulseStorage, -reboundImpulse);
-	bodyB->ApplyLinearImpulse(&ImpulseStorage);
+	XMFLOAT3 ImpulseStorage;
+	XMStoreFloat3(&ImpulseStorage, -1.0f * reboundImpulse);
+	bodyA->ApplyImpulse(&contact->ptOnA, &ImpulseStorage);
+
+	XMStoreFloat3(&ImpulseStorage, reboundImpulse);
+	bodyB->ApplyImpulse(&contact->ptOnB, &ImpulseStorage);
 
 
 	// projecting bodies outside of eachother
 
 	XMVECTOR dist = XMLoadFloat3(&contact->ptOnB) - XMLoadFloat3(&contact->ptOnA);
 
+	float totalMassInv = 1.0f / (bodyA->massInv + bodyB->massInv);
 	XMStoreFloat3(&bodyA->position, XMLoadFloat3(&bodyA->position) + dist * bodyA->massInv / totalMassInv);
 	XMStoreFloat3(&bodyB->position, XMLoadFloat3(&bodyB->position) + dist * bodyB->massInv / totalMassInv);
 	
 }
+
+void PhysicsEnigne::GetAngularImpulse(
+	const Body* body, 
+	const DirectX::XMFLOAT3* point,
+	const DirectX::XMFLOAT3* normal, 
+	DirectX::XMFLOAT3* Impulse)
+{
+	XMFLOAT4X4 inertiaTensor;
+	body->GetInverseInertiaTensorWorldSpace(&inertiaTensor);
+
+	XMFLOAT3 CoM;
+	body->GetCenterOfMassWorldSpace(&CoM);
+
+	XMVECTOR r = XMLoadFloat3(point) - XMLoadFloat3(&CoM);
+	XMVECTOR n = XMLoadFloat3(normal);
+	XMVECTOR prod =  XMVector3Transform(XMVector3Cross(n, r), XMLoadFloat4x4(&inertiaTensor));
+	XMStoreFloat3(Impulse, XMVector3Cross(r, prod));
+}
+
+
 
 int64_t PhysicsEnigne::AddBody(
 	const BodyProperties& props,
@@ -164,16 +202,23 @@ int64_t PhysicsEnigne::GetTransformMatrixForBody(
 
 int64_t PhysicsEnigne::UpdateBodies(float dt)
 {
+	static float time;
+	time += dt;
+	if (time >= 1.07)
+	{
+		int x = 2;
+	}
 	for (size_t i = 0; i < dynamicBodies.size(); i++)
 	{
 		Body* body = &dynamicBodies[i];
 		float mass = 1.0f / body->massInv;
 
-		XMVECTOR constForce = XMLoadFloat3(&constForces[i]);
-		XMVECTOR Impulse = constForce * mass * dt;
-		XMVECTOR dv = Impulse * body->massInv;
-		XMVECTOR v = XMLoadFloat3(&body->linVelocity) + dv;
-		XMStoreFloat3(&body->linVelocity, v);
+		XMVECTOR v_constForce = XMLoadFloat3(&constForces[i]);
+		XMVECTOR v_Impulse = v_constForce * mass * dt;
+		XMFLOAT3 Impulse;
+		XMStoreFloat3(&Impulse, v_Impulse);
+		body->ApplyLinearImpulse(&Impulse);
+
 	}
 	
 	FindIntersections(dt);
@@ -186,6 +231,17 @@ int64_t PhysicsEnigne::UpdateBodies(float dt)
 	for (size_t i = 0; i < detectedIntersections; i++)
 	{
 		Contact& contact = contactPoints[i];
+		static bool first = true;
+		if (first)
+		{
+			contactPoints[0].normal = { 4.30997316e-05, 1.00000000, 4.30997316e-05 };
+			contactPoints[0].localPtOnA = { 0.0555554628, 1.00199997, 0.0555554628 };
+			contactPoints[0].localPtOnB = { -1.9444444,2.20200014, -1.94444442 };
+			contactPoints[0].ptOnA = { -1.94444454,  -0.802765846, -1.94444454 };
+			contactPoints[0].ptOnB = { -1.94444442, -0.797999978, -1.94444442 };
+			contactPoints[0].timeOfImpact = 0.000600000028;
+			first = false;
+		}
 		ResolveContact(&contactPoints[i]);
 	}
 

@@ -15,7 +15,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
     Composer comp(&renderer, &physicsEngine, lights);
 
 
-    float dt = 0;
+    float dt = 0.001;
     while (wnd.ProcessMessages() == 0)
     {
         auto t1 = chrono::high_resolution_clock::now();
@@ -26,6 +26,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
         auto t2 = chrono::high_resolution_clock::now();
         chrono::duration duration = t2 - t1;
         dt = (float)duration.count() / 1'000'000'000.0f;
+        dt = 0.001;
     }
 
 }

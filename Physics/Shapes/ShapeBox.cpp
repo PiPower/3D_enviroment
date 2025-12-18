@@ -47,7 +47,7 @@ static void SupportFn(
 	XMVECTOR posVec = XMLoadFloat3(pos);
 	XMVECTOR rotationQuat = XMLoadFloat4(rotQuat);
 	XMMATRIX rotMat = XMMatrixRotationQuaternion(rotationQuat);
-	XMVECTOR vert = XMLoadFloat3(&box->vertecies[0]) + posVec;
+	XMVECTOR vert = XMVector3Transform(XMLoadFloat3(&box->vertecies[0]), rotMat) + posVec;
 	XMStoreFloat3(supportVec, vert);
 
 	float maxProd;
