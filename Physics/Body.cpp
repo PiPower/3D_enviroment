@@ -9,7 +9,8 @@ void Body::UpdateBody(
 	{
 		int  x = 2;
 	}
-	XMVECTOR v_newPosition = XMLoadFloat3(&linVelocity) * dt + XMLoadFloat3(&position);
+	XMVECTOR dr = XMLoadFloat3(&linVelocity) * dt;
+	XMVECTOR v_newPosition = dr + XMLoadFloat3(&position);
 	XMStoreFloat3(&position, v_newPosition);
 
 	XMFLOAT3 CoM;

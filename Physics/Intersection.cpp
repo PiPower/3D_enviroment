@@ -924,6 +924,20 @@ bool CheckIntersection(
 	constexpr uint8_t ITERS = 10;
 	float stepSize = dt / (float)ITERS;
 	float total_time = 0;
+
+	static int ticks = 0;
+	ticks++;
+
+	if (ticks == 9)
+	{
+		int x = 2;
+	}
+
+	if (bodyA->position.y < 0.22f)
+	{
+		int x = 2;
+	}
+
 	for (size_t i = 0; i < ITERS; i++)
 	{
 		if (GjkIntersectionTest(bodyA, bodyB, contact, 0.001))

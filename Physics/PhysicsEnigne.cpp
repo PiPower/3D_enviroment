@@ -233,37 +233,32 @@ int64_t PhysicsEnigne::UpdateBodies(float dt)
 		}
 	);
 
+	float accumulatedTime = 0.0f;
 	for (size_t i = 0; i < detectedIntersections; i++)
 	{
 		Contact& contact = contactPoints[i];
+		const float dt_c = contact.timeOfImpact - accumulatedTime;
+
 		static int tick;
-		if (tick == 1000)
+		if (tick == 8)
 		{
-			contactPoints[0].normal = { 4.30997316e-05, 1.00000000, 4.30997316e-05 };
-			contactPoints[0].localPtOnA = { 0.0555554628, 1.00199997, 0.0555554628 };
-			contactPoints[0].localPtOnB = { -1.9444444,2.20200014, -1.94444442 };
-			contactPoints[0].ptOnA = { -1.94444454,  -0.802765846, -1.94444454 };
-			contactPoints[0].ptOnB = { -1.94444442, -0.797999978, -1.94444442 };
-			contactPoints[0].timeOfImpact = 0.000600000028;
-		}
-		if (tick == 1000)
-		{
-			contactPoints[0].normal = { 0.000873695884, 0.999999523, -0.000327635964 };
-			contactPoints[0].localPtOnA = { -1.00140166, 1.00035167, -1.00138259 };
-			contactPoints[0].localPtOnB = { -2.51951122, 2.20199990, -2.51949716 };
-			contactPoints[0].ptOnA = { -2.51951504, -0.802183211, -2.51949596 };
-			contactPoints[0].ptOnB = { -2.51951122, -0.798000157, -2.51949716 };
-			contactPoints[0].timeOfImpact = 0.000500000024;
+			int x = 2;
 		}
 
-		tick++;
+		for (size_t i = 0; i < dynamicBodies.size(); i++)
+		{
+			dynamicBodies[i].UpdateBody(dt_c);
+		}
+
+
 		ResolveContact(&contactPoints[i]);
+		accumulatedTime += dt_c;
 	}
 
+	const float timeRemaining = dt - accumulatedTime;
 	for (size_t i = 0; i < dynamicBodies.size(); i++)
 	{
 		dynamicBodies[i].UpdateBody(dt);
 	}
-
 	return 0;
 }
