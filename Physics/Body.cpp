@@ -20,11 +20,11 @@ void Body::UpdateBody(
 	XMFLOAT4X4 partialInertiaTensor;
 	shape.getPartialInertiaTensor(&shape, &partialInertiaTensor);
 
-	XMMATRIX v_rotationMatrix = XMMatrixRotationQuaternion(XMQuaternionNormalize(XMLoadFloat4(&rotation)));
+	XMMATRIX v_rotationMatrix =  XMMatrixRotationQuaternion(XMQuaternionNormalize(XMLoadFloat4(&rotation)));
 	
-	XMMATRIX v_partialInertiaTensorWorld = v_rotationMatrix *
+	XMMATRIX v_partialInertiaTensorWorld = XMMatrixTranspose(v_rotationMatrix) *
 										   XMLoadFloat4x4(&partialInertiaTensor) *
-										   XMMatrixTranspose(v_rotationMatrix);
+										   v_rotationMatrix;
 
 
 	XMVECTOR v_angVelocity = XMLoadFloat3(&angVelocity);
@@ -47,7 +47,7 @@ void Body::UpdateBody(
 	v_rotation = XMQuaternionNormalize(v_rotation);
 	XMStoreFloat4(&rotation, v_rotation);
 
-	XMStoreFloat3(&position, XMLoadFloat3(&CoM) + XMVector3Transform(v_posToCoM, XMMatrixRotationQuaternion(v_dRotation)));
+	XMStoreFloat3(&position, XMLoadFloat3(&CoM) + XMVector3Transform(v_posToCoM, XMMatrixTranspose(XMMatrixRotationQuaternion(v_dRotation))));
 }
 
 void Body::ApplyLinearImpulse(
