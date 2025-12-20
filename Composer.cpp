@@ -75,7 +75,7 @@ void Composer::GenerateObjects()
 
             BodyProperties bodyProps;
             bodyProps.position = { -(float)boxCount * 2 + i * 4, 6, -(float)boxCount * 2 + j * 4.0f };
-            bodyProps.linVelocity = { 30, 0, 30};
+            bodyProps.linVelocity = { 40, 0, 40};
             bodyProps.angVelocity = { 0, 0, 0 };
             bodyProps.massInv = 1.0f / 10.0f;
             bodyProps.rotation = { 0, 0, 0, 1};
@@ -121,7 +121,7 @@ void Composer::GenerateObjects()
     bodyProps.position = { -36, 0, 0 };
     bodyProps.linVelocity = { 0, 0, 0 };
     bodyProps.angVelocity = { 0, 0, 0 };
-    bodyProps.massInv = 1.0f / 10.0f;
+    bodyProps.massInv = 0;
     bodyProps.rotation = { 0, 0, 0, 1 };
     bodyProps.elasticity = 1.0f;
 
@@ -141,7 +141,7 @@ void Composer::GenerateObjects()
     bodyProps.position = { 36, 0, 0 };
     bodyProps.linVelocity = { 0, 0, 0 };
     bodyProps.angVelocity = { 0, 0, 0 };
-    bodyProps.massInv = 1.0f / 10.0f;
+    bodyProps.massInv = 0;
     bodyProps.rotation = { 0, 0, 0, 1 };
     bodyProps.elasticity = 1.0f;
 
@@ -161,7 +161,7 @@ void Composer::GenerateObjects()
     bodyProps.position = { 0, 0, -36 };
     bodyProps.linVelocity = { 0, 0, 0 };
     bodyProps.angVelocity = { 0, 0, 0 };
-    bodyProps.massInv = 1.0f / 10.0f;
+    bodyProps.massInv = 0;
     bodyProps.rotation = { 0, 0, 0, 1 };
     bodyProps.elasticity = 1.0f;
 
@@ -181,7 +181,7 @@ void Composer::GenerateObjects()
     bodyProps.position = { 0, 0, 36 };
     bodyProps.linVelocity = { 0, 0, 0 };
     bodyProps.angVelocity = { 0, 0, 0 };
-    bodyProps.massInv = 1.0f / 10.0f;
+    bodyProps.massInv = 0;
     bodyProps.rotation = { 0, 0, 0, 1 };
     bodyProps.elasticity = 1.0f;
 

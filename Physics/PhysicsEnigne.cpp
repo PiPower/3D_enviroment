@@ -40,6 +40,10 @@ int64_t PhysicsEnigne::FindIntersections(float dt)
 			if (CheckIntersection(&dynamicBodies[i], &staticBodies[j], &contactPoints[detectedIntersections], dt))
 			{
 				detectedIntersections++;
+				if (j != 0)
+				{
+					int z = 2;
+				}
 				if (detectedIntersections >= contactPoints.size())
 				{
 					Contact fill = {};
@@ -99,6 +103,7 @@ void PhysicsEnigne::ResolveContact(
 
 	XMFLOAT3 CoM;
 	bodyA->GetCenterOfMassWorldSpace(&CoM);
+	auto dva = XMLoadFloat3(&contact->ptOnA) - XMLoadFloat3(&CoM);
 	XMVECTOR v_velA = XMLoadFloat3(&bodyA->linVelocity) + XMVector3Cross(XMLoadFloat3(&contact->ptOnA) - XMLoadFloat3(&CoM), XMLoadFloat3(&bodyA->angVelocity));
 	bodyB->GetCenterOfMassWorldSpace(&CoM);
 	XMVECTOR v_velB = XMLoadFloat3(&bodyB->linVelocity) + XMVector3Cross(XMLoadFloat3(&contact->ptOnB) - XMLoadFloat3(&CoM), XMLoadFloat3(&bodyB->angVelocity));
@@ -207,12 +212,7 @@ int64_t PhysicsEnigne::GetTransformMatrixForBody(
 
 int64_t PhysicsEnigne::UpdateBodies(float dt)
 {
-	static float time;
-	time += dt;
-	if (time >= 1.07)
-	{
-		int x = 2;
-	}
+
 	for (size_t i = 0; i < dynamicBodies.size(); i++)
 	{
 		Body* body = &dynamicBodies[i];
@@ -238,12 +238,6 @@ int64_t PhysicsEnigne::UpdateBodies(float dt)
 	{
 		Contact& contact = contactPoints[i];
 		const float dt_c = contact.timeOfImpact - accumulatedTime;
-
-		static int tick;
-		if (tick == 8)
-		{
-			int x = 2;
-		}
 
 		for (size_t i = 0; i < dynamicBodies.size(); i++)
 		{

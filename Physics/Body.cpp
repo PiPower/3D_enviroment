@@ -84,7 +84,7 @@ void Body::ApplyAngularImpulse(
 	if (len > maxAngularVelocity * maxAngularVelocity)
 	{
 		XMVECTOR vAngVelocity = XMLoadFloat3(&angVelocity);
-		XMVector3Normalize(vAngVelocity);
+		vAngVelocity = XMVector3Normalize(vAngVelocity);
 		vAngVelocity = vAngVelocity * maxAngularVelocity;
 		XMStoreFloat3(&angVelocity, vAngVelocity);
 	}

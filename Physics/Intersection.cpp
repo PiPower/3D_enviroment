@@ -769,7 +769,7 @@ static bool GjkIntersectionTest(
 {
 	constexpr float epsilon = 0.0001;
 	constexpr uint8_t maxIters = 10;
-	static int hits = 0;
+
 	Simplex simplex;
 	XMFLOAT3 dir = { 0, 1, 0 };
 	float lambdas[4] = {};
@@ -838,15 +838,6 @@ static bool GjkIntersectionTest(
 	if (!hasOrigin)
 	{
 		return false;
-	}
-	hits++;
-	if (hits == 1)
-	{
-		//while (true)
-		//{
-		//	GjkIntersectionTest(bodyA, bodyB, contact, bias);
-		//}
-		int z = 2;
 	}
 	// if simplex is not Tetrahedron build it
 	if (simplex.idxCount == 1)
@@ -924,19 +915,6 @@ bool CheckIntersection(
 	constexpr uint8_t ITERS = 10;
 	float stepSize = dt / (float)ITERS;
 	float total_time = 0;
-
-	static int ticks = 0;
-	ticks++;
-
-	if (ticks == 9)
-	{
-		int x = 2;
-	}
-
-	if (bodyA->position.y < 0.22f)
-	{
-		int x = 2;
-	}
 
 	for (size_t i = 0; i < ITERS; i++)
 	{
