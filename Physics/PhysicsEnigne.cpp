@@ -99,9 +99,9 @@ void PhysicsEnigne::ResolveContact(
 
 	XMFLOAT3 CoM;
 	bodyA->GetCenterOfMassWorldSpace(&CoM);
-	XMVECTOR v_velA = XMLoadFloat3(&bodyA->linVelocity) + XMVector3Cross(XMLoadFloat3(&bodyA->angVelocity), XMLoadFloat3(&contact->ptOnA) - XMLoadFloat3(&CoM));
+	XMVECTOR v_velA = XMLoadFloat3(&bodyA->linVelocity) + XMVector3Cross(XMLoadFloat3(&contact->ptOnA) - XMLoadFloat3(&CoM), XMLoadFloat3(&bodyA->angVelocity));
 	bodyB->GetCenterOfMassWorldSpace(&CoM);
-	XMVECTOR v_velB = XMLoadFloat3(&bodyB->linVelocity) + XMVector3Cross(XMLoadFloat3(&bodyB->angVelocity), XMLoadFloat3(&contact->ptOnB) - XMLoadFloat3(&CoM));
+	XMVECTOR v_velB = XMLoadFloat3(&bodyB->linVelocity) + XMVector3Cross(XMLoadFloat3(&contact->ptOnB) - XMLoadFloat3(&CoM), XMLoadFloat3(&bodyB->angVelocity));
 	auto z = v_velA - v_velB;
 	XMVECTOR closingSpeed = denominator * (1 + elastictyFactor) * XMVector3Dot(v_velA - v_velB, XMLoadFloat3(&contact->normal));
 	XMVECTOR reboundImpulse = XMLoadFloat3(&contact->normal) * closingSpeed;
@@ -121,12 +121,14 @@ void PhysicsEnigne::ResolveContact(
 
 
 	// projecting bodies outside of eachother
+	if (contact->timeOfImpact == 0.0f)
+	{
+		XMVECTOR dist = XMLoadFloat3(&contact->ptOnB) - XMLoadFloat3(&contact->ptOnA);
 
-	XMVECTOR dist = XMLoadFloat3(&contact->ptOnB) - XMLoadFloat3(&contact->ptOnA);
-
-	float totalMassInv = 1.0f / (bodyA->massInv + bodyB->massInv);
-	XMStoreFloat3(&bodyA->position, XMLoadFloat3(&bodyA->position) + dist * bodyA->massInv / totalMassInv);
-	XMStoreFloat3(&bodyB->position, XMLoadFloat3(&bodyB->position) + dist * bodyB->massInv / totalMassInv);
+		float totalMassInv = 1.0f / (bodyA->massInv + bodyB->massInv);
+		XMStoreFloat3(&bodyA->position, XMLoadFloat3(&bodyA->position) + dist * bodyA->massInv / totalMassInv);
+		XMStoreFloat3(&bodyB->position, XMLoadFloat3(&bodyB->position) + dist * bodyB->massInv / totalMassInv);
+	}
 	
 }
 
@@ -192,9 +194,12 @@ int64_t PhysicsEnigne::GetTransformMatrixForBody(
 	const Body* body = GetBody(bodyId);
 	body->shape.getTrasformationMatrix(body->shape.shapeData, mat);
 
+	XMMATRIX translation = XMMatrixTranslation(body->position.x, body->position.y, body->position.z);
+	XMMATRIX rotation = XMMatrixTranspose(XMMatrixRotationQuaternion(XMLoadFloat4(&body->rotation)));
 	XMMATRIX transform = XMLoadFloat4x4(mat) *
-						 XMMatrixRotationQuaternion(XMLoadFloat4(&body->rotation)) *
-						 XMMatrixTranslation(body->position.x, body->position.y, body->position.z);
+						 rotation *
+						 translation;
+						
 
 	XMStoreFloat4x4(mat, transform);
 	return 0;
@@ -231,8 +236,8 @@ int64_t PhysicsEnigne::UpdateBodies(float dt)
 	for (size_t i = 0; i < detectedIntersections; i++)
 	{
 		Contact& contact = contactPoints[i];
-		static bool first = true;
-		if (first)
+		static int tick;
+		if (tick == 1000)
 		{
 			contactPoints[0].normal = { 4.30997316e-05, 1.00000000, 4.30997316e-05 };
 			contactPoints[0].localPtOnA = { 0.0555554628, 1.00199997, 0.0555554628 };
@@ -240,8 +245,18 @@ int64_t PhysicsEnigne::UpdateBodies(float dt)
 			contactPoints[0].ptOnA = { -1.94444454,  -0.802765846, -1.94444454 };
 			contactPoints[0].ptOnB = { -1.94444442, -0.797999978, -1.94444442 };
 			contactPoints[0].timeOfImpact = 0.000600000028;
-			first = false;
 		}
+		if (tick == 1000)
+		{
+			contactPoints[0].normal = { 0.000873695884, 0.999999523, -0.000327635964 };
+			contactPoints[0].localPtOnA = { -1.00140166, 1.00035167, -1.00138259 };
+			contactPoints[0].localPtOnB = { -2.51951122, 2.20199990, -2.51949716 };
+			contactPoints[0].ptOnA = { -2.51951504, -0.802183211, -2.51949596 };
+			contactPoints[0].ptOnB = { -2.51951122, -0.798000157, -2.51949716 };
+			contactPoints[0].timeOfImpact = 0.000500000024;
+		}
+
+		tick++;
 		ResolveContact(&contactPoints[i]);
 	}
 

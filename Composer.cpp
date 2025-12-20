@@ -78,7 +78,8 @@ void Composer::GenerateObjects()
             bodyProps.linVelocity = { 0, 0, 0};
             bodyProps.angVelocity = { 0, 0, 0 };
             bodyProps.massInv = 1.0f / 10.0f;
-            bodyProps.rotation = { 0, 0, 0, 1.0f };
+            float angle = 3.14 / 4.0;
+            bodyProps.rotation = { sinf(angle), 0, 0, cosf(angle)};
             bodyProps.elasticity = 0.5f;
 
             physicsEngine->AddBody(bodyProps, ShapeType::OrientedBox, { 1.0f, 1.0f, 1.0f }, true, &physicsEntities[i * boxCount + j], { 0, -10, 0});
@@ -102,7 +103,7 @@ void Composer::GenerateObjects()
     bodyProps.linVelocity = { 0, 0, 0 };
     bodyProps.angVelocity = { 0, 0, 0 };
     bodyProps.massInv = 1.0f / 10.0f;
-    bodyProps.rotation = { 0, 0, 0, 0 };
+    bodyProps.rotation = { 0, 0, 0, 1 };
     bodyProps.elasticity = 1.0f;
 
     physicsEngine->AddBody(bodyProps, ShapeType::OrientedBox, { 35, 2.2, 35 }, false, &physicsEntities[boxCount * boxCount]);
@@ -122,7 +123,7 @@ void Composer::GenerateObjects()
     bodyProps.linVelocity = { 0, 0, 0 };
     bodyProps.angVelocity = { 0, 0, 0 };
     bodyProps.massInv = 1.0f / 10.0f;
-    bodyProps.rotation = { 0, 0, 0, 0 };
+    bodyProps.rotation = { 0, 0, 0, 1 };
     bodyProps.elasticity = 1.0f;
 
     physicsEngine->AddBody(bodyProps, ShapeType::OrientedBox, { 1, 20, 35 }, false, &physicsEntities[boxCount * boxCount + 1]);
@@ -142,7 +143,7 @@ void Composer::GenerateObjects()
     bodyProps.linVelocity = { 0, 0, 0 };
     bodyProps.angVelocity = { 0, 0, 0 };
     bodyProps.massInv = 1.0f / 10.0f;
-    bodyProps.rotation = { 0, 0, 0, 0 };
+    bodyProps.rotation = { 0, 0, 0, 1 };
     bodyProps.elasticity = 1.0f;
 
     physicsEngine->AddBody(bodyProps, ShapeType::OrientedBox, { 1, 20, 35 }, false, &physicsEntities[boxCount * boxCount + 2]);
@@ -162,7 +163,7 @@ void Composer::GenerateObjects()
     bodyProps.linVelocity = { 0, 0, 0 };
     bodyProps.angVelocity = { 0, 0, 0 };
     bodyProps.massInv = 1.0f / 10.0f;
-    bodyProps.rotation = { 0, 0, 0, 0 };
+    bodyProps.rotation = { 0, 0, 0, 1 };
     bodyProps.elasticity = 1.0f;
 
     physicsEngine->AddBody(bodyProps, ShapeType::OrientedBox, { 35, 20, 1 }, false, &physicsEntities[boxCount * boxCount + 3]);
@@ -182,7 +183,7 @@ void Composer::GenerateObjects()
     bodyProps.linVelocity = { 0, 0, 0 };
     bodyProps.angVelocity = { 0, 0, 0 };
     bodyProps.massInv = 1.0f / 10.0f;
-    bodyProps.rotation = { 0, 0, 0, 0 };
+    bodyProps.rotation = { 0, 0, 0, 1 };
     bodyProps.elasticity = 1.0f;
 
     physicsEngine->AddBody(bodyProps, ShapeType::OrientedBox, { 35, 20, 1 }, false, & physicsEntities[boxCount * boxCount + 4]);
@@ -203,7 +204,7 @@ void Composer::GenerateObjects()
     bodyProps.linVelocity = { 40, 0, 40 };
     bodyProps.angVelocity = { 0, 0, 0 };
     bodyProps.massInv = 1.0f / 40.0f;
-    bodyProps.rotation = { 0, 0, 0, 0 };
+    bodyProps.rotation = { 0, 0, 0, 1 };
     bodyProps.elasticity = 1.0f;
 
    //physicsEngine->AddBody(bodyProps, ShapeType::OrientedBox, { 1, 1, 1 }, true, & physicsEntities[boxCount * boxCount + 5]);

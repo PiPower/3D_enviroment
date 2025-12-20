@@ -1,4 +1,5 @@
 #pragma once
+
 #include <DirectXMath.h>
 #include "./Shapes/Shape.hpp"
 enum class ShapeType

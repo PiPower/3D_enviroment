@@ -46,7 +46,7 @@ static void SupportFn(
 	XMVECTOR dirVec = XMLoadFloat3(dir);
 	XMVECTOR posVec = XMLoadFloat3(pos);
 	XMVECTOR rotationQuat = XMLoadFloat4(rotQuat);
-	XMMATRIX rotMat = XMMatrixRotationQuaternion(rotationQuat);
+	XMMATRIX rotMat = XMMatrixTranspose(XMMatrixRotationQuaternion(rotationQuat));
 	XMVECTOR vert = XMVector3Transform(XMLoadFloat3(&box->vertecies[0]), rotMat) + posVec;
 	XMStoreFloat3(supportVec, vert);
 
@@ -92,7 +92,7 @@ static void GetInverseInertiaTensorWorldSpaceBox(
 {
 	shape->getInverseInertiaTensor(shape, invMass, inertiaTensor);
 	XMMATRIX tensor = XMLoadFloat4x4(inertiaTensor);
-	XMMATRIX rotationMat = XMMatrixRotationQuaternion(XMLoadFloat4(rotationQuat));
+	XMMATRIX rotationMat = XMMatrixTranspose(XMMatrixRotationQuaternion(XMLoadFloat4(rotationQuat)));
 	tensor = rotationMat * tensor * XMMatrixTranspose(rotationMat);
 	XMStoreFloat4x4(inertiaTensor, tensor);
 }

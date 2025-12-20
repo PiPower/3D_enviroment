@@ -298,7 +298,7 @@ static void BarycentricCoords(
 	XMVECTOR s2 = XMLoadFloat3(p2);
 	XMVECTOR s3 = XMLoadFloat3(p3);
 
-	XMVECTOR n = XMVector3Cross(s2 - s1, s3 - s1);
+	XMVECTOR n = XMVector3Cross(s3 - s1, s2 - s1);
 	XMVECTOR p0 = (XMVector3Dot(s1, n) * n) / XMVector3LengthSq(n);
 
 	float diff21[3], diff31[3];
@@ -496,13 +496,13 @@ static inline void GetOrtho(
 	XMFLOAT3 imm;
 	XMStoreFloat3(&imm, nVec * nVec);
 	XMVECTOR wVec = (imm.z > 0.9f * 0.9f) ? XMVectorSet(1, 0, 0 ,0) : XMVectorSet(0, 1, 0, 0);
-	uVec = XMVector3Cross(wVec, nVec);
+	uVec = XMVector3Cross(nVec, wVec);
 	uVec = XMVector3Normalize(uVec);
 
 
-	vVec = XMVector3Cross(nVec, uVec);
+	vVec = XMVector3Cross(uVec, nVec);
 	vVec = XMVector3Normalize(vVec);
-	uVec = XMVector3Cross(vVec, nVec);
+	uVec = XMVector3Cross(nVec, vVec);
 	uVec = XMVector3Normalize(uVec);
 
 	XMStoreFloat3(u, uVec);
@@ -519,7 +519,9 @@ static void SignedDistance1D(
 	XMVECTOR o = XMVectorZero();
 	XMVECTOR v = s2 - s1;
 
-	XMVECTOR p0 = s1 + v * XMVector3Dot(o - s1, v) / XMVector3LengthSq(v);
+	XMVECTOR p03 = s1 + v * XMVector3Dot(o - s1, v) / XMVector3LengthSq(v);
+	auto l = XMVector3LengthSq(v);
+	XMVECTOR p0 = s2 + v * XMVector3Dot(o - s2, v) / XMVector3LengthSq(v);
 
 	float mu[3];
 	XMStoreFloat3((XMFLOAT3*) &mu, s1 - s2);
@@ -558,7 +560,7 @@ static void SignedDistance2D(
 	XMVECTOR s2 = XMLoadFloat3(&simplex->ptOnSimplex[1]);
 	XMVECTOR s3 = XMLoadFloat3(&simplex->ptOnSimplex[2]);
 
-	XMVECTOR n = XMVector3Cross(s2 - s1, s3 - s1);
+	XMVECTOR n = XMVector3Cross(s3 - s1, s2 - s1);
 	XMVECTOR p0 = (XMVector3Dot(s1, n) * n) / XMVector3LengthSq(n);
 
 	float diff21[3], diff31[3];
@@ -767,7 +769,7 @@ static bool GjkIntersectionTest(
 {
 	constexpr float epsilon = 0.0001;
 	constexpr uint8_t maxIters = 10;
-
+	static int hits = 0;
 	Simplex simplex;
 	XMFLOAT3 dir = { 0, 1, 0 };
 	float lambdas[4] = {};
@@ -837,7 +839,15 @@ static bool GjkIntersectionTest(
 	{
 		return false;
 	}
-
+	hits++;
+	if (hits == 1)
+	{
+		//while (true)
+		//{
+		//	GjkIntersectionTest(bodyA, bodyB, contact, bias);
+		//}
+		int z = 2;
+	}
 	// if simplex is not Tetrahedron build it
 	if (simplex.idxCount == 1)
 	{
@@ -865,7 +875,7 @@ static bool GjkIntersectionTest(
 		XMVECTOR ab = XMLoadFloat3(&simplex.ptOnSimplex[1]) - XMLoadFloat3(&simplex.ptOnSimplex[0]);
 		XMVECTOR ac = XMLoadFloat3(&simplex.ptOnSimplex[2]) - XMLoadFloat3(&simplex.ptOnSimplex[0]);
 		XMFLOAT3 newDir;
-		XMStoreFloat3(&newDir, XMVector3Cross(ab, ac));
+		XMStoreFloat3(&newDir, XMVector3Cross(ac, ab));
 
 		SupportPoint supp;
 		GetSupport(bodyA, bodyB, &newDir, &supp, bias);
@@ -922,7 +932,7 @@ bool CheckIntersection(
 				XMVector3Normalize(XMLoadFloat3(&contact->ptOnB) - XMLoadFloat3(&contact->ptOnA))
 			);
 
-			bodyA->GetPointInLocalSpace(&contact->ptOnA, &contact->localPtOnA);
+ 			bodyA->GetPointInLocalSpace(&contact->ptOnA, &contact->localPtOnA);
 			bodyB->GetPointInLocalSpace(&contact->ptOnB, &contact->localPtOnB);
 			contact->timeOfImpact = total_time;
 			contact->bodyA = bodyA;

@@ -21,9 +21,9 @@ void Body::UpdateBody(
 
 	XMMATRIX v_rotationMatrix = XMMatrixRotationQuaternion(XMQuaternionNormalize(XMLoadFloat4(&rotation)));
 	
-	XMMATRIX v_partialInertiaTensorWorld = XMMatrixMultiply(
-		XMMatrixMultiply(v_rotationMatrix, XMLoadFloat4x4(&partialInertiaTensor)), 
-		XMMatrixTranspose(v_rotationMatrix));
+	XMMATRIX v_partialInertiaTensorWorld = v_rotationMatrix *
+										   XMLoadFloat4x4(&partialInertiaTensor) *
+										   XMMatrixTranspose(v_rotationMatrix);
 
 
 	XMVECTOR v_angVelocity = XMLoadFloat3(&angVelocity);
@@ -73,7 +73,7 @@ void Body::ApplyAngularImpulse(
 	XMFLOAT4X4 invInertiaTensor;
 	XMVECTOR vImpulse = XMLoadFloat3(Impulse);
 	shape.getInverseInertiaTensorWorldSpace(&shape, massInv, &rotation, &invInertiaTensor);
-
+	auto p = XMVector3Transform(vImpulse, XMLoadFloat4x4(&invInertiaTensor));
 	XMStoreFloat3(&angVelocity,
 		XMLoadFloat3(&angVelocity) + XMVector3Transform(vImpulse, XMLoadFloat4x4(&invInertiaTensor)) );
 
@@ -100,7 +100,7 @@ void Body::ApplyImpulse(
 
 	XMVECTOR r = XMLoadFloat3(contactPoint) - XMLoadFloat3(&CoM);
 	XMFLOAT3 dL;
-	XMStoreFloat3(&dL, XMVector3Cross(r, XMLoadFloat3(Impulse)));
+	XMStoreFloat3(&dL, -1.0f * XMVector3Cross(r, XMLoadFloat3(Impulse)));
 	ApplyAngularImpulse(&dL);
 }
 
@@ -121,12 +121,11 @@ void Body::GetPointInLocalSpace(
 	DirectX::XMFLOAT3* localSpacePoint) const
 {
 	XMFLOAT3 CoM;
-	shape.getCenterOfMass(&shape, &CoM);
-
-	XMVECTOR v_CoMglobalSpace = XMLoadFloat3(&position) + XMLoadFloat3(&CoM);
+	GetCenterOfMassWorldSpace(&CoM);
+	
 	XMMATRIX v_invRotiation = XMMatrixRotationQuaternion(XMQuaternionInverse(XMLoadFloat4(&rotation)));
-
-	XMVECTOR v_localPoint = XMVector3Transform(XMLoadFloat3(point) - v_CoMglobalSpace, v_invRotiation);
+	XMVECTOR v_point = XMLoadFloat3(point) - XMLoadFloat3(&CoM);
+	XMVECTOR v_localPoint = XMVector3Transform(v_point, XMMatrixTranspose(v_invRotiation));
 	XMStoreFloat3(localSpacePoint, v_localPoint);
 }
 
