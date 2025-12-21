@@ -130,9 +130,9 @@ void PhysicsEnigne::ResolveContact(
 	{
 		XMVECTOR dist = XMLoadFloat3(&contact->ptOnB) - XMLoadFloat3(&contact->ptOnA);
 
-		float totalMassInv = 1.0f / (bodyA->massInv + bodyB->massInv);
+		float totalMassInv = bodyA->massInv + bodyB->massInv;
 		XMStoreFloat3(&bodyA->position, XMLoadFloat3(&bodyA->position) + dist * bodyA->massInv / totalMassInv);
-		XMStoreFloat3(&bodyB->position, XMLoadFloat3(&bodyB->position) + dist * bodyB->massInv / totalMassInv);
+		XMStoreFloat3(&bodyB->position, XMLoadFloat3(&bodyB->position) - dist * bodyB->massInv / totalMassInv);
 	}
 	
 }

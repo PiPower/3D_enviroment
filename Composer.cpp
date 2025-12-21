@@ -14,7 +14,7 @@ Composer::Composer(
     const std::vector<Light>& lights)
     :
     cameraAngleX(0), cameraAngleY(0), camOrientation(eyeInitial, upInitial, lookDirInitial), 
-    renderer(renderer) , physicsEngine(physicsEngine), calculatePhysics(true), frameMode(false),
+    renderer(renderer) , physicsEngine(physicsEngine), calculatePhysics(true), frameMode(true),
     lights(lights)
 {
     vector<GeometryEntry> boxGeo({ GeometryType::Box });
@@ -62,9 +62,9 @@ void Composer::GenerateObjects()
     std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
     std::uniform_real_distribution<> dis(0, 1.0);
     std::uniform_real_distribution<> speedDees(0, 3.0);
-    constexpr uint8_t boxCount = 1;
-    physicsEntities.resize(boxCount * boxCount + 5);
-    physicsEntitiesTrsfm.resize(boxCount * boxCount + 5);
+    constexpr uint8_t boxCount = 5;
+    physicsEntities.resize(boxCount * boxCount + 6);
+    physicsEntitiesTrsfm.resize(boxCount * boxCount + 6);
     for (int i = 0; i < boxCount; i++)
     {
         for (int j = 0; j < boxCount; j++)
@@ -75,7 +75,7 @@ void Composer::GenerateObjects()
 
             BodyProperties bodyProps;
             bodyProps.position = { -(float)boxCount * 2 + i * 4, 6, -(float)boxCount * 2 + j * 4.0f };
-            bodyProps.linVelocity = { 40, 0, 40};
+            bodyProps.linVelocity = { 0, 0, 0};
             bodyProps.angVelocity = { 0, 0, 0 };
             bodyProps.massInv = 1.0f / 10.0f;
             bodyProps.rotation = { 0, 0, 0, 1};
@@ -196,23 +196,23 @@ void Composer::GenerateObjects()
 
     // missile
 
-    //renderer->AllocateUboResource(uboPool, UBO_OBJ_TRSF_RESOURCE_TYPE, &rectUbo);
-    //renderEntities.push_back({ 0, 0, rectUbo, 0 });
+    renderer->AllocateUboResource(uboPool, UBO_OBJ_TRSF_RESOURCE_TYPE, &rectUbo);
+    renderEntities.push_back({ 0, 0, rectUbo, 0 });
 
-    bodyProps.position = { -25, 10, -25 };
+    bodyProps.position = { -25, 7, -25 };
     bodyProps.linVelocity = { 40, 0, 40 };
     bodyProps.angVelocity = { 0, 0, 0 };
     bodyProps.massInv = 1.0f / 40.0f;
     bodyProps.rotation = { 0, 0, 0, 1 };
     bodyProps.elasticity = 1.0f;
 
-    //physicsEngine->AddBody(bodyProps, ShapeType::OrientedBox, { 1, 1, 1 }, true, & physicsEntities[boxCount * boxCount + 5]);
-    //physicsEngine->GetTransformMatrixForBody(physicsEntities[boxCount * boxCount + 1], &physicsEntitiesTrsfm[boxCount * boxCount + 5].transform);
+    physicsEngine->AddBody(bodyProps, ShapeType::OrientedBox, { 1, 1, 1 }, true, & physicsEntities[boxCount * boxCount + 5]);
+    physicsEngine->GetTransformMatrixForBody(physicsEntities[boxCount * boxCount + 1], &physicsEntitiesTrsfm[boxCount * boxCount + 5].transform);
 
-    //physicsEntitiesTrsfm[boxCount * boxCount + 5].color[0] = dis(gen);
-    //physicsEntitiesTrsfm[boxCount * boxCount + 5].color[1] = dis(gen);
-    //physicsEntitiesTrsfm[boxCount * boxCount + 5].color[2] = dis(gen);
-    //physicsEntitiesTrsfm[boxCount * boxCount + 5].color[3] = 1.0f;
+    physicsEntitiesTrsfm[boxCount * boxCount + 5].color[0] = dis(gen);
+    physicsEntitiesTrsfm[boxCount * boxCount + 5].color[1] = dis(gen);
+    physicsEntitiesTrsfm[boxCount * boxCount + 5].color[2] = dis(gen);
+    physicsEntitiesTrsfm[boxCount * boxCount + 5].color[3] = 1.0f;
 
 
 }
