@@ -123,6 +123,26 @@ static void GetCenterOfMassBox(
 	CoM->z = 0;
 }
 
+static BoundingBox GetBoundingBox_Box(
+	const Shape* shape,
+	const DirectX::XMFLOAT3* position,
+	const DirectX::XMFLOAT4* rotationQuat)
+{
+	Box* box = (Box*)shape->shapeData;
+
+	XMMATRIX rotationMat = XMMatrixTranspose(XMMatrixRotationQuaternion(XMLoadFloat4(rotationQuat)));
+	XMVECTOR pos = XMLoadFloat3(position);
+	BoundingBox bBox;
+	for (uint8_t i = 0; i < 8; i++)
+	{
+		XMFLOAT3 vertex;
+		XMStoreFloat3(&vertex, XMVector3Transform(XMLoadFloat3(&box->vertecies[i]), rotationMat) + pos);
+		bBox.Expand(vertex);
+	}
+
+	return bBox;
+}
+
 Shape GetDefaultBoxShape(
 	DirectX::XMFLOAT3 scales)
 {
@@ -133,6 +153,8 @@ Shape GetDefaultBoxShape(
 	boxShape.getInverseInertiaTensorWorldSpace = GetInverseInertiaTensorWorldSpaceBox;
 	boxShape.getCenterOfMass = GetCenterOfMassBox;
 	boxShape.getPartialInertiaTensor = GetPartialInertiaTensorBox;
+	boxShape.getBoundingBox = GetBoundingBox_Box;
+
 	Box* box = new Box();
 	box->scales = scales;
 

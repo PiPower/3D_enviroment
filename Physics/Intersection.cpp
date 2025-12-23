@@ -24,8 +24,8 @@ struct Edge
 	uint16_t j;
 
 
-	bool operator == (const Edge& rhs) const {
-		return ((i== rhs.i && j == rhs.j) || (i == rhs.j && j == rhs.i));
+	bool operator == (const Edge& pt) const {
+		return ((i== pt.i && j == pt.j) || (i == pt.j && j == pt.i));
 	}
 };
 

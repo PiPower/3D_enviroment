@@ -3,9 +3,17 @@
 #include "Body.hpp"
 #include "Intersection.hpp"
 
+
+struct BodyPlaneDistance
+{
+	size_t bodyId;
+	float distance;
+	bool isMin;
+};
+
 struct PhysicsEnigne
 {
-	PhysicsEnigne(size_t expectedDynamicBodies = 200);
+	PhysicsEnigne(size_t expectedDynamicBodies = 200, size_t expectedStaticBodies = 200);
 
 	int64_t AddBody(
 		const BodyProperties& props,
@@ -35,6 +43,14 @@ struct PhysicsEnigne
 		Contact* contact
 	);
 
+	void SortBodiesByDistanceToPlane(
+		 const DirectX::XMFLOAT3* normal,
+		float dt);
+
+	void CreateCollisionPairs();
+
+	void BroadPhase(float dt);
+
 	void GetAngularImpulse(
 		const Body* body, 
 		const DirectX::XMFLOAT3* point,
@@ -46,6 +62,7 @@ public:
 	std::vector<DirectX::XMFLOAT3> constForces; // per dynamic body
 	std::vector<Body> dynamicBodies;
 	std::vector<Contact> contactPoints;
+	std::vector<BodyPlaneDistance> sortedBodies;
 	size_t detectedIntersections;
 };
 

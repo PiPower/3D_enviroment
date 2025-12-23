@@ -10,10 +10,12 @@ using namespace DirectX;
 constexpr static uint64_t STATIC_FLAG = 0x01ULL << 63;
 
 PhysicsEnigne::PhysicsEnigne(
-	size_t expectedDynamicBodies)
+	size_t expectedDynamicBodies,
+	size_t expectedStaticBodies)
 {
 	// some arbitrary value, can be changed
 	contactPoints.resize(expectedDynamicBodies * expectedDynamicBodies * 2);
+	sortedBodies.resize((expectedDynamicBodies + expectedStaticBodies) * 2);
 }
 
 int64_t PhysicsEnigne::FindIntersections(float dt)
@@ -137,6 +139,54 @@ void PhysicsEnigne::ResolveContact(
 	
 }
 
+void PhysicsEnigne::SortBodiesByDistanceToPlane(
+	const DirectX::XMFLOAT3* normal,
+	float dt)
+{
+	XMVECTOR n = XMLoadFloat3(normal);
+	size_t i;
+	for (i = 0; i < dynamicBodies.size() * 2; i+=2)
+	{
+		constexpr float eps = 0.01f;
+		size_t bodyIdx = i / 2;
+		Body* body = &dynamicBodies[bodyIdx];
+		BoundingBox bBox = body->getBoundingBox();
+		XMFLOAT3 expansion;
+
+		XMStoreFloat3(&expansion,
+			XMLoadFloat3(&bBox.maxC) + XMLoadFloat3(&body->linVelocity) * dt);
+		bBox.Expand(expansion);
+		XMStoreFloat3(&expansion,
+			XMLoadFloat3(&bBox.maxC) + 1.0f * XMVectorSet(eps, eps, eps, 0) );
+		bBox.Expand(expansion);
+
+		XMStoreFloat3(&expansion,
+			XMLoadFloat3(&bBox.minC) + XMLoadFloat3(&body->linVelocity) * dt);
+		bBox.Expand(expansion);
+		XMStoreFloat3(&expansion,
+			XMLoadFloat3(&bBox.minC) - 1.0f * XMVectorSet(eps, eps, eps, 0));
+		bBox.Expand(expansion);
+
+		sortedBodies[bodyIdx].bodyId = bodyIdx;
+		sortedBodies[bodyIdx].isMin = true;
+		XMStoreFloat(&sortedBodies[bodyIdx].distance, XMVector3Dot(n, XMLoadFloat3(&bBox.minC)));
+
+		sortedBodies[bodyIdx + 1].bodyId = bodyIdx;
+		sortedBodies[bodyIdx + 1].isMin = false;
+		XMStoreFloat(&sortedBodies[bodyIdx + 1].distance, XMVector3Dot(n, XMLoadFloat3(&bBox.maxC)));
+	}
+
+	size_t bodyCount = (dynamicBodies.size() + staticBodies.size()) * 2;
+	std::sort(sortedBodies.begin(), sortedBodies.begin() + bodyCount,
+		[](const BodyPlaneDistance& l, const BodyPlaneDistance& r) { return l.distance > r.distance; });
+}
+
+void PhysicsEnigne::BroadPhase(float dt)
+{
+	XMFLOAT3 normal = { 1.0f, 1.0f, 1.0f };
+	SortBodiesByDistanceToPlane(&normal, dt);
+}
+
 void PhysicsEnigne::GetAngularImpulse(
 	const Body* body, 
 	const DirectX::XMFLOAT3* point,
@@ -226,6 +276,8 @@ int64_t PhysicsEnigne::UpdateBodies(float dt)
 
 	}
 	
+	BroadPhase(dt);
+
 	FindIntersections(dt);
 	sort(contactPoints.begin(), contactPoints.begin() + detectedIntersections, [](const Contact& l, const Contact& r)
 		{

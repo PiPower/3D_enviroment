@@ -5,10 +5,6 @@ using namespace DirectX;
 void Body::UpdateBody(
 	float dt)
 {
-	if (angVelocity.x != 0.0f || angVelocity.y != 0 || angVelocity.z != 0)
-	{
-		int  x = 2;
-	}
 	XMVECTOR dr = XMLoadFloat3(&linVelocity) * dt;
 	XMVECTOR v_newPosition = dr + XMLoadFloat3(&position);
 	XMStoreFloat3(&position, v_newPosition);
@@ -48,6 +44,16 @@ void Body::UpdateBody(
 	XMStoreFloat4(&rotation, v_rotation);
 
 	XMStoreFloat3(&position, XMLoadFloat3(&CoM) + XMVector3Transform(v_posToCoM, XMMatrixTranspose(XMMatrixRotationQuaternion(v_dRotation))));
+
+
+	if (linVelocity.x <= 0.3f)
+	{
+		linVelocity.x = 0;
+	}
+	if (linVelocity.z <= 0.3f)
+	{
+		linVelocity.z = 0;
+	}
 }
 
 void Body::ApplyLinearImpulse(
@@ -134,4 +140,9 @@ void Body::GetInverseInertiaTensorWorldSpace(
 	DirectX::XMFLOAT4X4* tensor) const
 {
 	shape.getInverseInertiaTensorWorldSpace(&shape, massInv, &rotation, tensor);
+}
+
+BoundingBox Body::getBoundingBox() const
+{
+	return shape.getBoundingBox(&shape, &position, &rotation);
 }

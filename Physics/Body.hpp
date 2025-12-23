@@ -51,5 +51,7 @@ struct Body
 
 	void GetInverseInertiaTensorWorldSpace(
 		DirectX::XMFLOAT4X4* tensor) const;
+
+	BoundingBox getBoundingBox() const;
 };
 

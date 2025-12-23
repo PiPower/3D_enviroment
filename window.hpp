@@ -34,9 +34,9 @@ public:
 		{
 		}
 
-		KeyEvent(const KeyEvent& rhs) noexcept
+		KeyEvent(const KeyEvent& pt) noexcept
 			:
-			Code(rhs.Code), Type(rhs.Type)
+			Code(pt.Code), Type(pt.Type)
 		{
 		}
 		// Overloaded assignment operator
@@ -47,9 +47,9 @@ public:
 		
 			return *this;
 		}
-		KeyEvent(KeyEvent&& rhs) noexcept
+		KeyEvent(KeyEvent&& pt) noexcept
 			:
-			Code(rhs.Code), Type(rhs.Type)
+			Code(pt.Code), Type(pt.Type)
 		{}
 
 		unsigned char Code;

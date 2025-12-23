@@ -155,6 +155,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Physics\BoundingBox.cpp" />
     <ClCompile Include="Composer.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Physics\Body.cpp" />
@@ -169,6 +170,7 @@
     <ClCompile Include="window.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Physics\BoundingBox.hpp" />
     <ClInclude Include="Composer.hpp" />
     <ClInclude Include="Physics\Body.hpp" />
     <ClInclude Include="Physics\Intersection.hpp" />

@@ -1,5 +1,6 @@
 #pragma once
 #include <DirectXMath.h>
+#include "../BoundingBox.hpp"
 #include <inttypes.h>
 
 struct Shape;
@@ -36,6 +37,11 @@ typedef void(*GetPartialInertiaTensor)(
 	const Shape* shape,
 	DirectX::XMFLOAT4X4* inertiaTensor);
 
+typedef BoundingBox (*GetBoundingBox)(
+	const Shape* shape,
+	const DirectX::XMFLOAT3* position,
+	const DirectX::XMFLOAT4* rotationQuat);
+
 struct Shape
 {
 	GetTrasformationMatrix getTrasformationMatrix;
@@ -44,5 +50,6 @@ struct Shape
 	GetInverseInertiaTensorWorldSpace getInverseInertiaTensorWorldSpace;
 	GetCenterOfMass getCenterOfMass;
 	GetPartialInertiaTensor getPartialInertiaTensor;
+	GetBoundingBox getBoundingBox;
 	char* shapeData;
 };
