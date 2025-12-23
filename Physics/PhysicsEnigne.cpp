@@ -7,7 +7,7 @@ using namespace std;
 using namespace DirectX;
 
 #define GET_BODY(id) if((id & STATIC_FLAG > 0) {staticBodies[(id & ~STATIC_FLAG) - 1];}else {dynamicBodies[(id & ~STATIC_FLAG) - 1];}
-constexpr static uint64_t STATIC_FLAG = 0x01ULL << 63;
+constexpr static uint64_t BODY_STATIC_FLAG = 0x01ULL << 63;
 
 PhysicsEnigne::PhysicsEnigne(
 	size_t expectedDynamicBodies,
@@ -61,13 +61,13 @@ int64_t PhysicsEnigne::FindIntersections(float dt)
 Body* PhysicsEnigne::GetBody(
 	uint64_t bodyId)
 {
-	if ((bodyId & STATIC_FLAG) > 0)
+	if ((bodyId & BODY_STATIC_FLAG) > 0)
 	{ 
-		return &staticBodies[(bodyId & ~STATIC_FLAG) - 1];
+		return &staticBodies[(bodyId & ~BODY_STATIC_FLAG) - 1];
 	}
 	else 
 	{ 
-		return &dynamicBodies[(bodyId & ~STATIC_FLAG) - 1];
+		return &dynamicBodies[(bodyId & ~BODY_STATIC_FLAG) - 1];
 	}
 }
 
@@ -148,37 +148,23 @@ void PhysicsEnigne::SortBodiesByDistanceToPlane(
 	for (i = 0; i < dynamicBodies.size() * 2; i+=2)
 	{
 		constexpr float eps = 0.01f;
-		size_t bodyIdx = i / 2;
-		Body* body = &dynamicBodies[bodyIdx];
-		BoundingBox bBox = body->getBoundingBox();
-		XMFLOAT3 expansion;
-
-		XMStoreFloat3(&expansion,
-			XMLoadFloat3(&bBox.maxC) + XMLoadFloat3(&body->linVelocity) * dt);
-		bBox.Expand(expansion);
-		XMStoreFloat3(&expansion,
-			XMLoadFloat3(&bBox.maxC) + 1.0f * XMVectorSet(eps, eps, eps, 0) );
-		bBox.Expand(expansion);
-
-		XMStoreFloat3(&expansion,
-			XMLoadFloat3(&bBox.minC) + XMLoadFloat3(&body->linVelocity) * dt);
-		bBox.Expand(expansion);
-		XMStoreFloat3(&expansion,
-			XMLoadFloat3(&bBox.minC) - 1.0f * XMVectorSet(eps, eps, eps, 0));
-		bBox.Expand(expansion);
-
-		sortedBodies[bodyIdx].bodyId = bodyIdx;
-		sortedBodies[bodyIdx].isMin = true;
-		XMStoreFloat(&sortedBodies[bodyIdx].distance, XMVector3Dot(n, XMLoadFloat3(&bBox.minC)));
-
-		sortedBodies[bodyIdx + 1].bodyId = bodyIdx;
-		sortedBodies[bodyIdx + 1].isMin = false;
-		XMStoreFloat(&sortedBodies[bodyIdx + 1].distance, XMVector3Dot(n, XMLoadFloat3(&bBox.maxC)));
+		size_t bodyId = i / 2;
+		Body* body = &dynamicBodies[bodyId];
+		AddBodyToSortedDistanceList(body, normal, dt, i, bodyId);
 	}
 
-	size_t bodyCount = (dynamicBodies.size() + staticBodies.size()) * 2;
-	std::sort(sortedBodies.begin(), sortedBodies.begin() + bodyCount,
-		[](const BodyPlaneDistance& l, const BodyPlaneDistance& r) { return l.distance > r.distance; });
+	for (size_t j = 0; j < staticBodies.size() * 2; j += 2)
+	{
+		constexpr float eps = 0.01f;
+		size_t bodyIdx = i + j;
+		size_t bodyId = (j / 2) | BODY_STATIC_FLAG;
+		Body* body = &staticBodies[j/2];
+		AddBodyToSortedDistanceList(body, normal, dt, bodyIdx, bodyId);
+	}
+
+	size_t bodyCount = (dynamicBodies.size() + staticBodies.size());
+	std::sort(sortedBodies.begin(), sortedBodies.begin() + bodyCount * 2,
+		[](const BodyPlaneDistance& l, const BodyPlaneDistance& r) { return l.distance < r.distance; });
 }
 
 void PhysicsEnigne::BroadPhase(float dt)
@@ -205,6 +191,41 @@ void PhysicsEnigne::GetAngularImpulse(
 	XMStoreFloat3(Impulse, XMVector3Cross(r, prod));
 }
 
+void PhysicsEnigne::AddBodyToSortedDistanceList(
+	const Body* body,
+	const DirectX::XMFLOAT3* normal,
+	float dt,
+	size_t bodyIdx,
+	size_t bodyId)
+{
+	constexpr float eps = 0.01f;
+	BoundingBox bBox = body->getBoundingBox();
+	XMFLOAT3 expansion;
+	XMVECTOR n = XMLoadFloat3(normal);
+
+	XMStoreFloat3(&expansion,
+		XMLoadFloat3(&bBox.maxC) + XMLoadFloat3(&body->linVelocity) * dt);
+	bBox.Expand(expansion);
+	XMStoreFloat3(&expansion,
+		XMLoadFloat3(&bBox.maxC) + 1.0f * XMVectorSet(eps, eps, eps, 0));
+	bBox.Expand(expansion);
+
+	XMStoreFloat3(&expansion,
+		XMLoadFloat3(&bBox.minC) + XMLoadFloat3(&body->linVelocity) * dt);
+	bBox.Expand(expansion);
+	XMStoreFloat3(&expansion,
+		XMLoadFloat3(&bBox.minC) - 1.0f * XMVectorSet(eps, eps, eps, 0));
+	bBox.Expand(expansion);
+
+	sortedBodies[bodyIdx].bodyId = bodyId;
+	sortedBodies[bodyIdx].isMin = true;
+	XMStoreFloat(&sortedBodies[bodyIdx].distance, XMVector3Dot(n, XMLoadFloat3(&bBox.minC)));
+
+	sortedBodies[bodyIdx + 1].bodyId = bodyId;
+	sortedBodies[bodyIdx + 1].isMin = false;
+	XMStoreFloat(&sortedBodies[bodyIdx + 1].distance, XMVector3Dot(n, XMLoadFloat3(&bBox.maxC)));
+
+}
 
 
 int64_t PhysicsEnigne::AddBody(
@@ -236,7 +257,7 @@ int64_t PhysicsEnigne::AddBody(
 		body.massInv = 0.0f;
 		staticBodies.push_back(body);
 		*bodyId = staticBodies.size();
-		*bodyId |= STATIC_FLAG;
+		*bodyId |= BODY_STATIC_FLAG;
 		return 0;
 	}
 	return 1;

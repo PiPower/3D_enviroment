@@ -57,6 +57,13 @@ struct PhysicsEnigne
 		const DirectX::XMFLOAT3* normal, 
 		DirectX::XMFLOAT3* Impulse);
 
+	void AddBodyToSortedDistanceList(
+		const Body* body,
+		const DirectX::XMFLOAT3* normal,
+		float dt,
+		size_t bodyIdx,
+		size_t bodyId);
+
 public:
 	std::vector<Body> staticBodies;
 	std::vector<DirectX::XMFLOAT3> constForces; // per dynamic body
