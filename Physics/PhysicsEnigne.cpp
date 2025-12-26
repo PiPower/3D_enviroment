@@ -16,44 +16,27 @@ PhysicsEnigne::PhysicsEnigne(
 	// some arbitrary value, can be changed
 	contactPoints.resize(expectedDynamicBodies * expectedDynamicBodies * 2);
 	sortedBodies.resize((expectedDynamicBodies + expectedStaticBodies) * 2);
+	collisionPairs.resize((expectedDynamicBodies + expectedStaticBodies) * 2);
 }
 
 int64_t PhysicsEnigne::FindIntersections(float dt)
 {
 	detectedIntersections = 0;
-	for (size_t i = 0; i < dynamicBodies.size(); i++)
+	for (size_t i = 0; i < collisionPairs.size(); i++)
 	{
+		Body* bodyA = GetBody(collisionPairs[i].idA);
+		Body* bodyB = GetBody(collisionPairs[i].idB);
 
-		for (size_t j = i + 1; j < dynamicBodies.size(); j++)
+		if (CheckIntersection(bodyA, bodyB, &contactPoints[detectedIntersections], dt))
 		{
-			if (CheckIntersection(&dynamicBodies[i], &dynamicBodies[j], &contactPoints[detectedIntersections], dt))
+			detectedIntersections++;
+			if (detectedIntersections >= contactPoints.size())
 			{
-				detectedIntersections++;
-				if (detectedIntersections >= contactPoints.size())
-				{
-					Contact fill = {};
-					contactPoints.resize(contactPoints.size() * 4, fill);
-				}
+				Contact fill = {};
+				contactPoints.resize(contactPoints.size() * 4, fill);
 			}
 		}
-
-		for (size_t j =0; j < staticBodies.size(); j++)
-		{
-			if (CheckIntersection(&dynamicBodies[i], &staticBodies[j], &contactPoints[detectedIntersections], dt))
-			{
-				detectedIntersections++;
-				if (j != 0)
-				{
-					int z = 2;
-				}
-				if (detectedIntersections >= contactPoints.size())
-				{
-					Contact fill = {};
-					contactPoints.resize(contactPoints.size() * 4, fill);
-				}
-			}
-		}
-
+	
 	}
 	return 0;
 }
@@ -150,7 +133,7 @@ void PhysicsEnigne::SortBodiesByDistanceToPlane(
 		constexpr float eps = 0.01f;
 		size_t bodyId = i / 2;
 		Body* body = &dynamicBodies[bodyId];
-		AddBodyToSortedDistanceList(body, normal, dt, i, bodyId);
+		AddBodyToSortedDistanceList(body, normal, dt, i, bodyId + 1);
 	}
 
 	for (size_t j = 0; j < staticBodies.size() * 2; j += 2)
@@ -159,7 +142,7 @@ void PhysicsEnigne::SortBodiesByDistanceToPlane(
 		size_t bodyIdx = i + j;
 		size_t bodyId = (j / 2) | BODY_STATIC_FLAG;
 		Body* body = &staticBodies[j/2];
-		AddBodyToSortedDistanceList(body, normal, dt, bodyIdx, bodyId);
+		AddBodyToSortedDistanceList(body, normal, dt, bodyIdx, bodyId + 1);
 	}
 
 	size_t bodyCount = (dynamicBodies.size() + staticBodies.size());
@@ -171,6 +154,7 @@ void PhysicsEnigne::BroadPhase(float dt)
 {
 	XMFLOAT3 normal = { 1.0f, 1.0f, 1.0f };
 	SortBodiesByDistanceToPlane(&normal, dt);
+	BuildCollisionPairs();
 }
 
 void PhysicsEnigne::GetAngularImpulse(
@@ -224,6 +208,43 @@ void PhysicsEnigne::AddBodyToSortedDistanceList(
 	sortedBodies[bodyIdx + 1].bodyId = bodyId;
 	sortedBodies[bodyIdx + 1].isMin = false;
 	XMStoreFloat(&sortedBodies[bodyIdx + 1].distance, XMVector3Dot(n, XMLoadFloat3(&bBox.maxC)));
+
+}
+
+void PhysicsEnigne::BuildCollisionPairs()
+{
+	collisionPairs.clear();
+	size_t bodyCount = (dynamicBodies.size() + staticBodies.size());
+	// Now that the bodies are sorted, build the collision pairs
+	for (int i = 0; i < bodyCount * 2; i++) 
+	{
+		const BodyPlaneDistance& a = sortedBodies[i];
+		if (!a.isMin) 
+		{
+			continue;
+		}
+
+		CollisionPair pair;
+		pair.idA = a.bodyId;
+
+		for (int j = i + 1; j < bodyCount * 2; j++)
+		{
+			const BodyPlaneDistance& b = sortedBodies[j];
+			// if we've hit the end of the a element, then we're done creating pairs with a
+			if (b.bodyId == a.bodyId )
+			{
+				break;
+			}
+
+			if (!b.isMin || (b.bodyId & BODY_STATIC_FLAG) > 0)
+			{
+				continue;
+			}
+
+			pair.idB = b.bodyId;
+			collisionPairs.push_back(pair);
+		}
+	}
 
 }
 

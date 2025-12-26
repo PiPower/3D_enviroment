@@ -11,6 +11,12 @@ struct BodyPlaneDistance
 	bool isMin;
 };
 
+struct CollisionPair
+{
+	size_t idA;
+	size_t idB;
+};
+
 struct PhysicsEnigne
 {
 	PhysicsEnigne(size_t expectedDynamicBodies = 200, size_t expectedStaticBodies = 200);
@@ -47,8 +53,6 @@ struct PhysicsEnigne
 		 const DirectX::XMFLOAT3* normal,
 		float dt);
 
-	void CreateCollisionPairs();
-
 	void BroadPhase(float dt);
 
 	void GetAngularImpulse(
@@ -64,11 +68,14 @@ struct PhysicsEnigne
 		size_t bodyIdx,
 		size_t bodyId);
 
+	void BuildCollisionPairs();
+
 public:
 	std::vector<Body> staticBodies;
 	std::vector<DirectX::XMFLOAT3> constForces; // per dynamic body
 	std::vector<Body> dynamicBodies;
 	std::vector<Contact> contactPoints;
+	std::vector<CollisionPair> collisionPairs;
 	std::vector<BodyPlaneDistance> sortedBodies;
 	size_t detectedIntersections;
 };

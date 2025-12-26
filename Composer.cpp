@@ -200,7 +200,7 @@ void Composer::GenerateObjects()
     renderEntities.push_back({ 0, 0, rectUbo, 0 });
 
     bodyProps.position = { -25, 7, -25 };
-    bodyProps.linVelocity = { 0, 0, 0 };
+    bodyProps.linVelocity = { 40, 0, 40 };
     bodyProps.angVelocity = { 0, 0, 0 };
     bodyProps.massInv = 1.0f / 40.0f;
     bodyProps.rotation = { 0, 0, 0, 1 };
