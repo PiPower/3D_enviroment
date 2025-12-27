@@ -33,6 +33,11 @@ struct Composer
 	void ProcessUserInput(
 		Window* window,
 		float dt);
+
+	void AddBody( const ShapeType& type, 
+		const BodyProperties& props,
+		const DirectX::XMFLOAT3& scales, 
+		const DirectX::XMFLOAT4& color);
 public:
 	Renderer* renderer;
 	PhysicsEnigne* physicsEngine;

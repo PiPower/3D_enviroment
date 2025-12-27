@@ -7,7 +7,7 @@ using namespace std;
 static constexpr XMFLOAT3 eyeInitial = { -0.0f, 9.0f, -0.0f };
 static constexpr XMFLOAT3 lookDirInitial = { 0.0f, 0.0f, 1.0f };
 static constexpr XMFLOAT3 upInitial = { 0.0f, 1.0f, 0.0f };
-
+static constexpr uint64_t graphicsPipelineType = (uint64_t)PipelineTypes::Graphics;
 Composer::Composer(
     Renderer* renderer,
     PhysicsEnigne* physicsEngine,
@@ -21,7 +21,7 @@ Composer::Composer(
     renderer->CreateMeshCollection(boxGeo, &boxCollection);
     renderer->CreateUboPool(sizeof(Camera) + lights.size() * sizeof(Light), sizeof(ObjectUbo), 300'000, &uboPool);
     renderer->AllocateUboResource(uboPool, UBO_GLOBAL_RESOURCE_TYPE, &globalUbo);
-    renderer->BindUboPoolToPipeline((uint64_t)PipelineTypes::Graphics, uboPool, globalUbo);
+    renderer->BindUboPoolToPipeline(graphicsPipelineType, uboPool, globalUbo);
 
     globalUboBuffer = new char[sizeof(Camera) + lights.size() * sizeof(Light)];
     memcpy(globalUboBuffer + sizeof(Camera), lights.data(), lights.size() * sizeof(Light));
@@ -40,7 +40,7 @@ void Composer::RenderScene()
     UpdateCamera();
 
     renderer->BeginRendering();
-    renderer->Render(boxCollection, (uint64_t)PipelineTypes::Graphics, renderEntities);
+    renderer->Render(boxCollection, graphicsPipelineType, renderEntities);
     renderer->Present();
 }
 
@@ -60,160 +60,76 @@ void Composer::GenerateObjects()
 {
     std::random_device rd;  // Will be used to obtain a seed for the random number engine
     std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
-    std::uniform_real_distribution<> dis(0, 1.0);
-    std::uniform_real_distribution<> speedDees(0, 3.0);
-    constexpr uint8_t boxCount = 5;
-    physicsEntities.resize(boxCount * boxCount + 6);
-    physicsEntitiesTrsfm.resize(boxCount * boxCount + 6);
-    for (int i = 0; i < boxCount; i++)
-    {
-        for (int j = 0; j < boxCount; j++)
-        {
-            uint64_t rectUbo;
-            renderer->AllocateUboResource(uboPool, UBO_OBJ_TRSF_RESOURCE_TYPE, &rectUbo);
-            renderEntities.push_back({ 0, 0, rectUbo, 0 });
-
-            BodyProperties bodyProps;
-            bodyProps.position = { -(float)boxCount * 2 + i * 4, 6, -(float)boxCount * 2 + j * 4.0f };
-            bodyProps.linVelocity = { 0, 0, 0};
-            bodyProps.angVelocity = { 0, 0, 0 };
-            bodyProps.massInv = 1.0f / 10.0f;
-            bodyProps.rotation = { 0, 0, 0, 1};
-            bodyProps.elasticity = 0.5f;
-
-            physicsEngine->AddBody(bodyProps, ShapeType::OrientedBox, { 1.0f, 1.0f, 1.0f }, true, &physicsEntities[i * boxCount + j], { 0, -10, 0});
-            physicsEngine->GetTransformMatrixForBody(physicsEntities[i * boxCount + j], &physicsEntitiesTrsfm[i * boxCount + j].transform);
-
-            physicsEntitiesTrsfm[i * boxCount + j].color[0] = dis(gen);
-            physicsEntitiesTrsfm[i * boxCount + j].color[1] = dis(gen);
-            physicsEntitiesTrsfm[i * boxCount + j].color[2] = dis(gen);
-            physicsEntitiesTrsfm[i * boxCount + j].color[3] = 1.0f;
-
-        }
-    }
-
-    uint64_t rectUbo;
-    renderer->AllocateUboResource(uboPool, UBO_OBJ_TRSF_RESOURCE_TYPE, &rectUbo);
-    renderEntities.push_back({ 0, 0, rectUbo, 0 });
+    std::uniform_real_distribution<float> dis(0, 1.0);
 
     // floor
-    BodyProperties bodyProps;
-    bodyProps.position = { 0, -3.0, 0 };
-    bodyProps.linVelocity = { 0, 0, 0 };
-    bodyProps.angVelocity = { 0, 0, 0 };
-    bodyProps.massInv = 0;
-    bodyProps.rotation = { 0, 0, 0, 1 };
-    bodyProps.elasticity = 1.0f;
-
-    physicsEngine->AddBody(bodyProps, ShapeType::OrientedBox, { 35, 2.2, 35 }, false, &physicsEntities[boxCount * boxCount]);
-    physicsEngine->GetTransformMatrixForBody(physicsEntities[boxCount * boxCount], &physicsEntitiesTrsfm[boxCount * boxCount].transform);
-
-    physicsEntitiesTrsfm[boxCount * boxCount].color[0] = dis(gen);
-    physicsEntitiesTrsfm[boxCount * boxCount].color[1] = dis(gen);
-    physicsEntitiesTrsfm[boxCount * boxCount].color[2] = dis(gen);
-    physicsEntitiesTrsfm[boxCount * boxCount].color[3] = 1.0f;
-
+    {
+        BodyProperties bodyProps;
+        bodyProps.position = { 0, -3.0, 0 };
+        bodyProps.linVelocity = { 0, 0, 0 };
+        bodyProps.angVelocity = { 0, 0, 0 };
+        bodyProps.massInv = 0;
+        bodyProps.rotation = { 0, 0, 0, 1 };
+        bodyProps.elasticity = 1.0f;
+        XMFLOAT3 scales = { 35, 2.2, 35 };
+        XMFLOAT4 color = { dis(gen), dis(gen), dis(gen), 1.0f };
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, color);
+    }
     // left wall
-
-    renderer->AllocateUboResource(uboPool, UBO_OBJ_TRSF_RESOURCE_TYPE, &rectUbo);
-    renderEntities.push_back({ 0, 0, rectUbo, 0 });
-
-    bodyProps.position = { -36, 0, 0 };
-    bodyProps.linVelocity = { 0, 0, 0 };
-    bodyProps.angVelocity = { 0, 0, 0 };
-    bodyProps.massInv = 0;
-    bodyProps.rotation = { 0, 0, 0, 1 };
-    bodyProps.elasticity = 1.0f;
-
-    physicsEngine->AddBody(bodyProps, ShapeType::OrientedBox, { 1, 20, 35 }, false, &physicsEntities[boxCount * boxCount + 1]);
-    physicsEngine->GetTransformMatrixForBody(physicsEntities[boxCount * boxCount + 1], &physicsEntitiesTrsfm[boxCount * boxCount + 1].transform);
-
-    physicsEntitiesTrsfm[boxCount * boxCount + 1].color[0] = dis(gen);
-    physicsEntitiesTrsfm[boxCount * boxCount + 1].color[1] = dis(gen);
-    physicsEntitiesTrsfm[boxCount * boxCount + 1].color[2] = dis(gen);
-    physicsEntitiesTrsfm[boxCount * boxCount + 1].color[3] = 1.0f;
+    {
+        BodyProperties bodyProps;
+        bodyProps.position = { -35, 0, 0 };
+        bodyProps.linVelocity = { 0, 0, 0 };
+        bodyProps.angVelocity = { 0, 0, 0 };
+        bodyProps.massInv = 0;
+        bodyProps.rotation = { 0, 0, 0, 1 };
+        bodyProps.elasticity = 1.0f;
+        XMFLOAT3 scales = { 1, 20, 35 };
+        XMFLOAT4 color = { dis(gen), dis(gen), dis(gen), 1.0f };
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, color);
+    }
 
     // right wall
-
-    renderer->AllocateUboResource(uboPool, UBO_OBJ_TRSF_RESOURCE_TYPE, &rectUbo);
-    renderEntities.push_back({ 0, 0, rectUbo, 0 });
-
-    bodyProps.position = { 36, 0, 0 };
-    bodyProps.linVelocity = { 0, 0, 0 };
-    bodyProps.angVelocity = { 0, 0, 0 };
-    bodyProps.massInv = 0;
-    bodyProps.rotation = { 0, 0, 0, 1 };
-    bodyProps.elasticity = 1.0f;
-
-    physicsEngine->AddBody(bodyProps, ShapeType::OrientedBox, { 1, 20, 35 }, false, &physicsEntities[boxCount * boxCount + 2]);
-    physicsEngine->GetTransformMatrixForBody(physicsEntities[boxCount * boxCount + 1], &physicsEntitiesTrsfm[boxCount * boxCount + 2].transform);
-
-    physicsEntitiesTrsfm[boxCount * boxCount + 2].color[0] = dis(gen);
-    physicsEntitiesTrsfm[boxCount * boxCount + 2].color[1] = dis(gen);
-    physicsEntitiesTrsfm[boxCount * boxCount + 2].color[2] = dis(gen);
-    physicsEntitiesTrsfm[boxCount * boxCount + 2].color[3] = 1.0f;
+    {
+        BodyProperties bodyProps;
+        bodyProps.position = { 35, 0, 0 };
+        bodyProps.linVelocity = { 0, 0, 0 };
+        bodyProps.angVelocity = { 0, 0, 0 };
+        bodyProps.massInv = 0;
+        bodyProps.rotation = { 0, 0, 0, 1 };
+        bodyProps.elasticity = 1.0f;
+        XMFLOAT3 scales = { 1, 20, 35 };
+        XMFLOAT4 color = { dis(gen), dis(gen), dis(gen), 1.0f };
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, color);
+    }
 
     // front wall
-
-    renderer->AllocateUboResource(uboPool, UBO_OBJ_TRSF_RESOURCE_TYPE, &rectUbo);
-    renderEntities.push_back({ 0, 0, rectUbo, 0 });
-
-    bodyProps.position = { 0, 0, -36 };
-    bodyProps.linVelocity = { 0, 0, 0 };
-    bodyProps.angVelocity = { 0, 0, 0 };
-    bodyProps.massInv = 0;
-    bodyProps.rotation = { 0, 0, 0, 1 };
-    bodyProps.elasticity = 1.0f;
-
-    physicsEngine->AddBody(bodyProps, ShapeType::OrientedBox, { 35, 20, 1 }, false, &physicsEntities[boxCount * boxCount + 3]);
-    physicsEngine->GetTransformMatrixForBody(physicsEntities[boxCount * boxCount + 1], &physicsEntitiesTrsfm[boxCount * boxCount + 3].transform);
-
-    physicsEntitiesTrsfm[boxCount * boxCount + 3].color[0] = dis(gen);
-    physicsEntitiesTrsfm[boxCount * boxCount + 3].color[1] = dis(gen);
-    physicsEntitiesTrsfm[boxCount * boxCount + 3].color[2] = dis(gen);
-    physicsEntitiesTrsfm[boxCount * boxCount + 3].color[3] = 1.0f;
+    {
+        BodyProperties bodyProps;
+        bodyProps.position = { 0, 0, -35 };
+        bodyProps.linVelocity = { 0, 0, 0 };
+        bodyProps.angVelocity = { 0, 0, 0 };
+        bodyProps.massInv = 0;
+        bodyProps.rotation = { 0, 0, 0, 1 };
+        bodyProps.elasticity = 1.0f;
+        XMFLOAT3 scales = { 35, 20, 1 };
+        XMFLOAT4 color = { dis(gen), dis(gen), dis(gen), 1.0f };
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, color);
+    }
 
     // back wall
-
-    renderer->AllocateUboResource(uboPool, UBO_OBJ_TRSF_RESOURCE_TYPE, &rectUbo);
-    renderEntities.push_back({ 0, 0, rectUbo, 0 });
-
-    bodyProps.position = { 0, 0, 36 };
-    bodyProps.linVelocity = { 0, 0, 0 };
-    bodyProps.angVelocity = { 0, 0, 0 };
-    bodyProps.massInv = 0;
-    bodyProps.rotation = { 0, 0, 0, 1 };
-    bodyProps.elasticity = 1.0f;
-
-    physicsEngine->AddBody(bodyProps, ShapeType::OrientedBox, { 35, 20, 1 }, false, & physicsEntities[boxCount * boxCount + 4]);
-    physicsEngine->GetTransformMatrixForBody(physicsEntities[boxCount * boxCount + 1], &physicsEntitiesTrsfm[boxCount * boxCount + 4].transform);
-
-    physicsEntitiesTrsfm[boxCount * boxCount + 4].color[0] = dis(gen);
-    physicsEntitiesTrsfm[boxCount * boxCount + 4].color[1] = dis(gen);
-    physicsEntitiesTrsfm[boxCount * boxCount + 4].color[2] = dis(gen);
-    physicsEntitiesTrsfm[boxCount * boxCount + 4].color[3] = 1.0f;
-
-
-    // missile
-
-    renderer->AllocateUboResource(uboPool, UBO_OBJ_TRSF_RESOURCE_TYPE, &rectUbo);
-    renderEntities.push_back({ 0, 0, rectUbo, 0 });
-
-    bodyProps.position = { -25, 7, -25 };
-    bodyProps.linVelocity = { 40, 0, 40 };
-    bodyProps.angVelocity = { 0, 0, 0 };
-    bodyProps.massInv = 1.0f / 40.0f;
-    bodyProps.rotation = { 0, 0, 0, 1 };
-    bodyProps.elasticity = 1.0f;
-
-    physicsEngine->AddBody(bodyProps, ShapeType::OrientedBox, { 1, 1, 1 }, true, & physicsEntities[boxCount * boxCount + 5]);
-    physicsEngine->GetTransformMatrixForBody(physicsEntities[boxCount * boxCount + 1], &physicsEntitiesTrsfm[boxCount * boxCount + 5].transform);
-
-    physicsEntitiesTrsfm[boxCount * boxCount + 5].color[0] = dis(gen);
-    physicsEntitiesTrsfm[boxCount * boxCount + 5].color[1] = dis(gen);
-    physicsEntitiesTrsfm[boxCount * boxCount + 5].color[2] = dis(gen);
-    physicsEntitiesTrsfm[boxCount * boxCount + 5].color[3] = 1.0f;
-
+    {
+        BodyProperties bodyProps;
+        bodyProps.position = { 0, 0, 35 };
+        bodyProps.linVelocity = { 0, 0, 0 };
+        bodyProps.angVelocity = { 0, 0, 0 };
+        bodyProps.massInv = 0;
+        bodyProps.rotation = { 0, 0, 0, 1 };
+        bodyProps.elasticity = 1.0f;
+        XMFLOAT3 scales = { 35, 20, 1 };
+        XMFLOAT4 color = { dis(gen), dis(gen), dis(gen), 1.0f };
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, color);
+    }
 
 }
 
@@ -316,4 +232,29 @@ void Composer::ProcessUserInput(
     XMStoreFloat3(&camOrientation.eye, eyeVec);
     XMStoreFloat3(&camOrientation.up, upVec);
     XMStoreFloat3(&camOrientation.lookDir, lookDirVec);
+}
+
+void Composer::AddBody(
+    const ShapeType& type,
+    const BodyProperties& props,
+    const DirectX::XMFLOAT3& scales, 
+    const DirectX::XMFLOAT4& color)
+{
+    uint64_t uboId;
+    renderer->AllocateUboResource(uboPool, UBO_OBJ_TRSF_RESOURCE_TYPE, &uboId);
+    renderEntities.push_back({ 0, 0, uboId, 0 });
+
+
+    size_t entitySize = physicsEntities.size();
+    physicsEntities.push_back(0);
+    physicsEntitiesTrsfm.push_back({});
+
+    physicsEngine->AddBody(props, type, scales, false, &physicsEntities[entitySize]);
+    physicsEngine->GetTransformMatrixForBody(physicsEntities[entitySize], &physicsEntitiesTrsfm[entitySize].transform);
+
+    physicsEntitiesTrsfm[entitySize].color[0] = color.x;
+    physicsEntitiesTrsfm[entitySize].color[1] = color.y;
+    physicsEntitiesTrsfm[entitySize].color[2] = color.z;
+    physicsEntitiesTrsfm[entitySize].color[3] = color.w;
+
 }
