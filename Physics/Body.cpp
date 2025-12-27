@@ -45,15 +45,6 @@ void Body::UpdateBody(
 
 	XMStoreFloat3(&position, XMLoadFloat3(&CoM) + XMVector3Transform(v_posToCoM, XMMatrixTranspose(XMMatrixRotationQuaternion(v_dRotation))));
 
-
-	if (linVelocity.x <= 0.3f)
-	{
-		linVelocity.x = 0;
-	}
-	if (linVelocity.z <= 0.3f)
-	{
-		linVelocity.z = 0;
-	}
 }
 
 void Body::ApplyLinearImpulse(

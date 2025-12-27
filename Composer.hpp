@@ -39,6 +39,7 @@ struct Composer
 		const DirectX::XMFLOAT3& scales, 
 		const DirectX::XMFLOAT4& color);
 public:
+	DirectX::XMFLOAT3 characterImpulse;
 	Renderer* renderer;
 	PhysicsEnigne* physicsEngine;
 	float cameraAngleX;

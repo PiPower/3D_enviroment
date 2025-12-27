@@ -327,6 +327,10 @@ int64_t PhysicsEnigne::UpdateBodies(float dt)
 
 		XMVECTOR v_constForce = XMLoadFloat3(&constForces[i]);
 		XMVECTOR v_dynamicForce = XMLoadFloat3(&dynamicForces[i]);
+		if (dynamicForces[i].z != 0)
+		{
+			int x = 2;
+		}
 		XMVECTOR v_Impulse = (v_constForce + v_dynamicForce) * mass * dt;
 		XMFLOAT3 Impulse;
 		XMStoreFloat3(&Impulse, v_Impulse);

@@ -8,6 +8,8 @@ static constexpr XMFLOAT3 eyeInitial = { -0.0f, 9.0f, -0.0f };
 static constexpr XMFLOAT3 lookDirInitial = { 0.0f, 0.0f, 1.0f };
 static constexpr XMFLOAT3 upInitial = { 0.0f, 1.0f, 0.0f };
 static constexpr uint64_t graphicsPipelineType = (uint64_t)PipelineTypes::Graphics;
+static constexpr size_t characterId = 0;
+
 Composer::Composer(
     Renderer* renderer,
     PhysicsEnigne* physicsEngine,
@@ -15,7 +17,7 @@ Composer::Composer(
     :
     cameraAngleX(0), cameraAngleY(0), camOrientation(eyeInitial, upInitial, lookDirInitial), 
     renderer(renderer) , physicsEngine(physicsEngine), calculatePhysics(true), frameMode(true),
-    lights(lights)
+    lights(lights), characterImpulse({0, 0, 0})
 {
     vector<GeometryEntry> boxGeo({ GeometryType::Box });
     renderer->CreateMeshCollection(boxGeo, &boxCollection);
@@ -149,6 +151,9 @@ void Composer::UpdateObjects(
 {
     if (calculatePhysics)
     {
+        physicsEngine->AddForce(physicsEntities[characterId], characterImpulse);
+        characterImpulse = { 0, 0, 0 };
+
         physicsEngine->UpdateBodies(dt);
         if (frameMode)
         {
@@ -198,6 +203,10 @@ void Composer::ProcessUserInput(
     if (window->IsKeyPressed(VK_CONTROL)) { eyeVec = XMVectorSubtract(eyeVec, XMVectorScale(upInitialVec, dt * 10.0f)); }
     if (window->IsKeyPressed('D')) { eyeVec = XMVectorAdd(eyeVec, XMVectorScale(XMVector3Cross(upVec, lookDirVec), dt * 10.0f)); }
     if (window->IsKeyPressed('A')) { eyeVec = XMVectorSubtract(eyeVec, XMVectorScale(XMVector3Cross(upVec, lookDirVec), dt * 10.0f)); }
+    if (window->IsKeyPressed(VK_UP)) { characterImpulse = { 0, 0, 10 }; }
+    if (window->IsKeyPressed(VK_DOWN)) { characterImpulse = { 0, 0, -10 }; }
+    if (window->IsKeyPressed(VK_LEFT)) { characterImpulse = { 10, 0, 0 }; }
+    if (window->IsKeyPressed(VK_RIGHT)) { characterImpulse = { -10, 0, 0 }; }
     if (window->IsLeftPressed())
     {
         static float angleX = 0.0f, angleY = 0.0f;
