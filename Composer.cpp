@@ -58,21 +58,32 @@ void Composer::UpdateCamera()
 
 void Composer::GenerateObjects()
 {
-    std::random_device rd;  // Will be used to obtain a seed for the random number engine
-    std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
-    std::uniform_real_distribution<float> dis(0, 1.0);
+    // character
+    {
+        BodyProperties bodyProps;
+        bodyProps.position = { 0, 10, 0 };
+        bodyProps.linVelocity = { 0, 0, 0 };
+        bodyProps.angVelocity = { 0, 0, 0 };
+        bodyProps.massInv = 1.0f/20.f;
+        bodyProps.rotation = { 0, 0, 0, 1 };
+        bodyProps.elasticity = 0.0f;
+        XMFLOAT3 scales = { 1.0f, 1.0f, 1.0f};
+        XMFLOAT4 color = { 1.0f,  1.0f,  1.0f, 1.0f };
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, color);
+    }
+
 
     // floor
     {
         BodyProperties bodyProps;
-        bodyProps.position = { 0, -3.0, 0 };
+        bodyProps.position = { 0, 0, 0 };
         bodyProps.linVelocity = { 0, 0, 0 };
         bodyProps.angVelocity = { 0, 0, 0 };
         bodyProps.massInv = 0;
         bodyProps.rotation = { 0, 0, 0, 1 };
         bodyProps.elasticity = 1.0f;
-        XMFLOAT3 scales = { 35, 2.2, 35 };
-        XMFLOAT4 color = { dis(gen), dis(gen), dis(gen), 1.0f };
+        XMFLOAT3 scales = { 35, 2, 35 };
+        XMFLOAT4 color = { 0.2f, 0.5f, 0.1f, 1.0f };
         AddBody(ShapeType::OrientedBox, bodyProps, scales, color);
     }
     // left wall
@@ -85,7 +96,7 @@ void Composer::GenerateObjects()
         bodyProps.rotation = { 0, 0, 0, 1 };
         bodyProps.elasticity = 1.0f;
         XMFLOAT3 scales = { 1, 20, 35 };
-        XMFLOAT4 color = { dis(gen), dis(gen), dis(gen), 1.0f };
+        XMFLOAT4 color = { 0.5f, 0.1f, 0.1f, 1.0f };
         AddBody(ShapeType::OrientedBox, bodyProps, scales, color);
     }
 
@@ -99,7 +110,7 @@ void Composer::GenerateObjects()
         bodyProps.rotation = { 0, 0, 0, 1 };
         bodyProps.elasticity = 1.0f;
         XMFLOAT3 scales = { 1, 20, 35 };
-        XMFLOAT4 color = { dis(gen), dis(gen), dis(gen), 1.0f };
+        XMFLOAT4 color = { 0.5f, 0.1f, 0.1f, 1.0f };
         AddBody(ShapeType::OrientedBox, bodyProps, scales, color);
     }
 
@@ -113,7 +124,7 @@ void Composer::GenerateObjects()
         bodyProps.rotation = { 0, 0, 0, 1 };
         bodyProps.elasticity = 1.0f;
         XMFLOAT3 scales = { 35, 20, 1 };
-        XMFLOAT4 color = { dis(gen), dis(gen), dis(gen), 1.0f };
+        XMFLOAT4 color = { 0.5f, 0.1f, 0.1f, 1.0f };
         AddBody(ShapeType::OrientedBox, bodyProps, scales, color);
     }
 
@@ -127,7 +138,7 @@ void Composer::GenerateObjects()
         bodyProps.rotation = { 0, 0, 0, 1 };
         bodyProps.elasticity = 1.0f;
         XMFLOAT3 scales = { 35, 20, 1 };
-        XMFLOAT4 color = { dis(gen), dis(gen), dis(gen), 1.0f };
+        XMFLOAT4 color = { 0.5f, 0.1f, 0.1f, 1.0f };
         AddBody(ShapeType::OrientedBox, bodyProps, scales, color);
     }
 
@@ -244,12 +255,12 @@ void Composer::AddBody(
     renderer->AllocateUboResource(uboPool, UBO_OBJ_TRSF_RESOURCE_TYPE, &uboId);
     renderEntities.push_back({ 0, 0, uboId, 0 });
 
-
     size_t entitySize = physicsEntities.size();
     physicsEntities.push_back(0);
     physicsEntitiesTrsfm.push_back({});
 
-    physicsEngine->AddBody(props, type, scales, false, &physicsEntities[entitySize]);
+    bool isDynamic = props.massInv != 0.0f;
+    physicsEngine->AddBody(props, type, scales, isDynamic, &physicsEntities[entitySize]);
     physicsEngine->GetTransformMatrixForBody(physicsEntities[entitySize], &physicsEntitiesTrsfm[entitySize].transform);
 
     physicsEntitiesTrsfm[entitySize].color[0] = color.x;

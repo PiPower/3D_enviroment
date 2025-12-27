@@ -41,6 +41,21 @@ int64_t PhysicsEnigne::FindIntersections(float dt)
 	return 0;
 }
 
+void PhysicsEnigne::AddForce(
+	uint64_t bodyId, 
+	const DirectX::XMFLOAT3& Force)
+{
+	if ((bodyId & BODY_STATIC_FLAG) > 0)
+	{
+		return;
+	}
+
+	dynamicForces[bodyId - 1];
+	XMStoreFloat3(&dynamicForces[bodyId - 1],
+		XMLoadFloat3(&dynamicForces[bodyId - 1]) + XMLoadFloat3(&Force));
+	return ;
+}
+
 Body* PhysicsEnigne::GetBody(
 	uint64_t bodyId)
 {
@@ -269,6 +284,7 @@ int64_t PhysicsEnigne::AddBody(
 	if (isDynamic)
 	{
 		constForces.push_back(constForce);
+		dynamicForces.push_back({ 0, 0, 0 });
 		dynamicBodies.push_back(body);
 		*bodyId = dynamicBodies.size();
 		return 0;
@@ -311,11 +327,13 @@ int64_t PhysicsEnigne::UpdateBodies(float dt)
 		float mass = 1.0f / body->massInv;
 
 		XMVECTOR v_constForce = XMLoadFloat3(&constForces[i]);
-		XMVECTOR v_Impulse = v_constForce * mass * dt;
+		XMVECTOR v_dynamicForce = XMLoadFloat3(&dynamicForces[i]);
+		XMVECTOR v_Impulse = (v_constForce + v_dynamicForce) * mass * dt;
 		XMFLOAT3 Impulse;
 		XMStoreFloat3(&Impulse, v_Impulse);
 		body->ApplyLinearImpulse(&Impulse);
 
+		dynamicForces[i] = { .0f, .0f, .0f };
 	}
 	
 	BroadPhase(dt);

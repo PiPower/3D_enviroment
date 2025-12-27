@@ -38,6 +38,10 @@ struct PhysicsEnigne
 	int64_t FindIntersections(
 		float dt);
 
+	void AddForce(
+		uint64_t bodyId,
+		const DirectX::XMFLOAT3& Force);
+
 	Body* GetBody(
 		uint64_t bodyId);
 
@@ -73,6 +77,7 @@ struct PhysicsEnigne
 public:
 	std::vector<Body> staticBodies;
 	std::vector<DirectX::XMFLOAT3> constForces; // per dynamic body
+	std::vector<DirectX::XMFLOAT3> dynamicForces; // per dynamic body
 	std::vector<Body> dynamicBodies;
 	std::vector<Contact> contactPoints;
 	std::vector<CollisionPair> collisionPairs;
