@@ -50,7 +50,6 @@ void PhysicsEnigne::AddForce(
 		return;
 	}
 
-	dynamicForces[bodyId - 1];
 	XMStoreFloat3(&dynamicForces[bodyId - 1],
 		XMLoadFloat3(&dynamicForces[bodyId - 1]) + XMLoadFloat3(&Force));
 	return ;
