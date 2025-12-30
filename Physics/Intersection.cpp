@@ -776,7 +776,7 @@ static bool GjkIntersectionTest(
 	SupportPoint support;
 	uint8_t iterCount = 0;
 
-	GetSupport(bodyA, bodyB, &dir, &support, bias);
+	GetSupport(bodyA, bodyB, &dir, &support, 0.0f);
 	simplex.AddSupport(&support);
 	XMVECTOR vecDir = XMLoadFloat3(&simplex.ptOnSimplex[0]) * -1.0f;
 	XMStoreFloat3(&dir, vecDir);
@@ -787,7 +787,7 @@ static bool GjkIntersectionTest(
 	while (!hasOrigin && iterCount < maxIters)
 	{
 		vecDir = XMLoadFloat3(&dir);
-		GetSupport(bodyA, bodyB, &dir, &support, bias);
+		GetSupport(bodyA, bodyB, &dir, &support, 0.0f);
 		if (HasPoint(&simplex, &support))
 		{
 			break;
@@ -846,7 +846,7 @@ static bool GjkIntersectionTest(
 		XMStoreFloat3(&searchDir, XMLoadFloat3(&simplex.ptOnSimplex[0]) * -1.0f);
 
 		SupportPoint supp;
-		GetSupport(bodyA, bodyB, &searchDir, &supp, bias);
+		GetSupport(bodyA, bodyB, &searchDir, &supp, 0.0f);
 		simplex.AddSupport(&supp);
 	}
 	if (simplex.idxCount == 2)
@@ -858,7 +858,7 @@ static bool GjkIntersectionTest(
 		GetOrtho(&n, &u, &v);
 
 		SupportPoint supp;
-		GetSupport(bodyA, bodyB, &u, &supp, bias);
+		GetSupport(bodyA, bodyB, &u, &supp, 0.0f);
 		simplex.AddSupport(&supp);
 	}
 	if (simplex.idxCount == 3)
@@ -869,7 +869,7 @@ static bool GjkIntersectionTest(
 		XMStoreFloat3(&newDir, XMVector3Cross(ac, ab));
 
 		SupportPoint supp;
-		GetSupport(bodyA, bodyB, &newDir, &supp, bias);
+		GetSupport(bodyA, bodyB, &newDir, &supp, 0.0f);
 		simplex.AddSupport(&supp);
 		
 	}
@@ -911,6 +911,8 @@ bool CheckIntersection(
 	Contact* contact,
 	float dt)
 {
+	Body copyBodyA = *bodyA;
+	Body copyBodyB = *bodyB;
 	// divide time into sections and iterate
 	constexpr uint8_t ITERS = 10;
 	float stepSize = dt / (float)ITERS;
@@ -918,28 +920,23 @@ bool CheckIntersection(
 
 	for (size_t i = 0; i < ITERS; i++)
 	{
-		if (GjkIntersectionTest(bodyA, bodyB, contact, 0.001))
+		if (GjkIntersectionTest(&copyBodyA, &copyBodyB, contact, 0.001))
 		{
 			XMStoreFloat3(&contact->normal,
 				XMVector3Normalize(XMLoadFloat3(&contact->ptOnB) - XMLoadFloat3(&contact->ptOnA))
 			);
 
- 			bodyA->GetPointInLocalSpace(&contact->ptOnA, &contact->localPtOnA);
-			bodyB->GetPointInLocalSpace(&contact->ptOnB, &contact->localPtOnB);
+			copyBodyA.GetPointInLocalSpace(&contact->ptOnA, &contact->localPtOnA);
+			copyBodyB.GetPointInLocalSpace(&contact->ptOnB, &contact->localPtOnB);
 			contact->timeOfImpact = total_time;
 			contact->bodyA = bodyA;
 			contact->bodyB = bodyB;
-			bodyA->UpdateBody(-total_time);
-			bodyB->UpdateBody(-total_time);
 			return true;
 		}
-		bodyA->UpdateBody(stepSize);
-		bodyB->UpdateBody(stepSize);
+		copyBodyA.UpdateBody(stepSize);
+		copyBodyB.UpdateBody(stepSize);
 		total_time += stepSize;
 	}
-
-	bodyA->UpdateBody(-dt);
-	bodyB->UpdateBody(-dt);
 
 	return false;
 }
