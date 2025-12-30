@@ -761,6 +761,22 @@ static bool HasPoint(
 	return false;
 }
 
+static bool CoplanarTest(const Simplex& simplex)
+{
+	constexpr float eps = 0.001;
+
+	XMVECTOR p0 = XMLoadFloat3(&simplex.ptOnSimplex[0]);
+	XMVECTOR p1 = XMLoadFloat3(&simplex.ptOnSimplex[1]);
+	XMVECTOR p2 = XMLoadFloat3(&simplex.ptOnSimplex[2]);
+	XMVECTOR p3 = XMLoadFloat3(&simplex.ptOnSimplex[3]);
+
+	XMVECTOR normal = XMVector3Normalize(XMVector3Cross(p0 - p1, p0 - p2));
+	float prod;
+	XMStoreFloat(&prod, XMVector3Dot(normal, p3));
+
+	return abs(prod) <= eps;
+}
+
 static bool GjkIntersectionTest(
 	Body* bodyA,
 	Body* bodyB,
@@ -878,6 +894,12 @@ static bool GjkIntersectionTest(
 	//
 	XMVECTOR avg = XMVectorZero();
 
+
+	// when point lay on plain EPA tends to break
+	if (CoplanarTest(simplex))
+	{
+		return false;
+	}
 
 	for (int i = 0; i < 4; i++) 
 	{
