@@ -21,20 +21,16 @@ PhysicsEnigne::PhysicsEnigne(
 
 int64_t PhysicsEnigne::FindIntersections(float dt)
 {
-	detectedIntersections = 0;
+	contactPoints.clear();
+	contactPoints.push_back({});
 	for (size_t i = 0; i < collisionPairs.size(); i++)
 	{
 		Body* bodyA = GetBody(collisionPairs[i].idA);
 		Body* bodyB = GetBody(collisionPairs[i].idB);
 
-		if (CheckIntersection(bodyA, bodyB, &contactPoints[detectedIntersections], dt))
+		if (CheckIntersection(bodyA, bodyB, &contactPoints[contactPoints.size() - 1], dt))
 		{
-			detectedIntersections++;
-			if (detectedIntersections >= contactPoints.size())
-			{
-				Contact fill = {};
-				contactPoints.resize(contactPoints.size() * 4, fill);
-			}
+			contactPoints.push_back({});
 		}
 	
 	}
@@ -360,14 +356,14 @@ int64_t PhysicsEnigne::UpdateBodies(float dt)
 	BroadPhase(dt);
 
 	FindIntersections(dt);
-	sort(contactPoints.begin(), contactPoints.begin() + detectedIntersections, [](const Contact& l, const Contact& r)
+	sort(contactPoints.begin(), contactPoints.end() - 1, [](const Contact& l, const Contact& r)
 		{
 			return l.timeOfImpact < r.timeOfImpact;
 		}
 	);
 
 	float accumulatedTime = 0.0f;
-	for (size_t i = 0; i < detectedIntersections; i++)
+	for (size_t i = 0; i < contactPoints.size() - 1; i++)
 	{
 		Contact& contact = contactPoints[i];
 		const float dt_c = contact.timeOfImpact - accumulatedTime;

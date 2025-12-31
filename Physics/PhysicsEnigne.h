@@ -93,6 +93,5 @@ public:
 	std::vector<Contact> contactPoints;
 	std::vector<CollisionPair> collisionPairs;
 	std::vector<BodyPlaneDistance> sortedBodies;
-	size_t detectedIntersections;
 };
 
