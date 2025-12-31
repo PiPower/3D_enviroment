@@ -26,7 +26,7 @@ struct Body
 	float massInv;
 	DirectX::XMFLOAT4 rotation;
 	DirectX::XMFLOAT3 angVelocity;
-
+	bool allowAngularImpulse;
 	Shape shape;
 
 	void UpdateBody(

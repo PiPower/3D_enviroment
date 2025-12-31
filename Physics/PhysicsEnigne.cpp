@@ -43,6 +43,7 @@ int64_t PhysicsEnigne::FindIntersections(float dt)
 
 void PhysicsEnigne::AddForce(
 	uint64_t bodyId, 
+	uint8_t	forceComponent,
 	const DirectX::XMFLOAT3& Force)
 {
 	if ((bodyId & BODY_STATIC_FLAG) > 0)
@@ -50,9 +51,30 @@ void PhysicsEnigne::AddForce(
 		return;
 	}
 
-	XMStoreFloat3(&dynamicForces[bodyId - 1],
-		XMLoadFloat3(&dynamicForces[bodyId - 1]) + XMLoadFloat3(&Force));
-	return ;
+	XMFLOAT3 force;
+	XMStoreFloat3(&force, XMLoadFloat3(&dynamicForces[bodyId - 1]) + XMLoadFloat3(&Force));
+
+	if ((forceComponent & X_COMPONENT) > 0) { dynamicForces[bodyId - 1].x = force.x; }
+	if ((forceComponent & Y_COMPONENT) > 0) { dynamicForces[bodyId - 1].y = force.y; }
+	if ((forceComponent & Z_COMPONENT) > 0) { dynamicForces[bodyId - 1].z = force.z; }
+
+	return;
+}
+
+void PhysicsEnigne::SetLinearVelocity(
+	uint64_t bodyId,
+	uint8_t	velocityComponent,
+	const DirectX::XMFLOAT3& v)
+{
+	if ((bodyId & BODY_STATIC_FLAG) > 0)
+	{
+		return;
+	}
+
+	if ((velocityComponent & X_COMPONENT) > 0) { dynamicBodies[bodyId - 1].linVelocity.x = v.x; }
+	if ((velocityComponent & Y_COMPONENT) > 0) { dynamicBodies[bodyId - 1].linVelocity.y = v.y; }
+	if ((velocityComponent & Z_COMPONENT) > 0) { dynamicBodies[bodyId - 1].linVelocity.z = v.z; }
+	return;
 }
 
 Body* PhysicsEnigne::GetBody(
@@ -102,11 +124,9 @@ void PhysicsEnigne::ResolveContact(
 
 	XMFLOAT3 CoM;
 	bodyA->GetCenterOfMassWorldSpace(&CoM);
-	auto dva = XMLoadFloat3(&contact->ptOnA) - XMLoadFloat3(&CoM);
 	XMVECTOR v_velA = XMLoadFloat3(&bodyA->linVelocity) + XMVector3Cross(XMLoadFloat3(&contact->ptOnA) - XMLoadFloat3(&CoM), XMLoadFloat3(&bodyA->angVelocity));
 	bodyB->GetCenterOfMassWorldSpace(&CoM);
 	XMVECTOR v_velB = XMLoadFloat3(&bodyB->linVelocity) + XMVector3Cross(XMLoadFloat3(&contact->ptOnB) - XMLoadFloat3(&CoM), XMLoadFloat3(&bodyB->angVelocity));
-	auto z = v_velA - v_velB;
 	XMVECTOR closingSpeed = denominator * (1 + elastictyFactor) * XMVector3Dot(v_velA - v_velB, XMLoadFloat3(&contact->normal));
 	XMVECTOR reboundImpulse = XMLoadFloat3(&contact->normal) * closingSpeed;
 
@@ -269,6 +289,7 @@ int64_t PhysicsEnigne::AddBody(
 	DirectX::XMFLOAT3 scales,
 	bool isDynamic,
 	uint64_t* bodyId,
+	bool allowAngularImpulse,
 	DirectX::XMFLOAT3 constForce)
 {
 	Body body;
@@ -278,6 +299,7 @@ int64_t PhysicsEnigne::AddBody(
 	body.position = props.position;
 	body.rotation = props.rotation;
 	body.elasticity = props.elasticity;
+	body.allowAngularImpulse = allowAngularImpulse;
 	body.shape = CreateDefaultShape(shapeType, scales);
 
 	if (isDynamic)
@@ -327,10 +349,6 @@ int64_t PhysicsEnigne::UpdateBodies(float dt)
 
 		XMVECTOR v_constForce = XMLoadFloat3(&constForces[i]);
 		XMVECTOR v_dynamicForce = XMLoadFloat3(&dynamicForces[i]);
-		if (dynamicForces[i].z != 0)
-		{
-			int x = 2;
-		}
 		XMVECTOR v_Impulse = (v_constForce + v_dynamicForce) * mass * dt;
 		XMFLOAT3 Impulse;
 		XMStoreFloat3(&Impulse, v_Impulse);

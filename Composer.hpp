@@ -37,9 +37,10 @@ struct Composer
 	void AddBody( const ShapeType& type, 
 		const BodyProperties& props,
 		const DirectX::XMFLOAT3& scales, 
-		const DirectX::XMFLOAT4& color);
+		const DirectX::XMFLOAT4& color,
+		bool allowAngularImpulse);
 public:
-	DirectX::XMFLOAT3 characterImpulse;
+	DirectX::XMFLOAT3 characterVelocity;
 	Renderer* renderer;
 	PhysicsEnigne* physicsEngine;
 	float cameraAngleX;

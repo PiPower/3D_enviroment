@@ -4,7 +4,7 @@
 using namespace DirectX;
 using namespace std;
 
-static constexpr XMFLOAT3 eyeInitial = { -0.0f, 9.0f, -0.0f };
+static constexpr XMFLOAT3 eyeInitial = { -10.0f, 9.0f, -25.0f };
 static constexpr XMFLOAT3 lookDirInitial = { 0.0f, 0.0f, 1.0f };
 static constexpr XMFLOAT3 upInitial = { 0.0f, 1.0f, 0.0f };
 static constexpr uint64_t graphicsPipelineType = (uint64_t)PipelineTypes::Graphics;
@@ -17,7 +17,7 @@ Composer::Composer(
     :
     cameraAngleX(0), cameraAngleY(0), camOrientation(eyeInitial, upInitial, lookDirInitial), 
     renderer(renderer) , physicsEngine(physicsEngine), calculatePhysics(true), frameMode(true),
-    lights(lights), characterImpulse({0, 0, 0})
+    lights(lights), characterVelocity({0, 0, 0})
 {
     vector<GeometryEntry> boxGeo({ GeometryType::Box });
     renderer->CreateMeshCollection(boxGeo, &boxCollection);
@@ -63,30 +63,42 @@ void Composer::GenerateObjects()
     // character
     {
         BodyProperties bodyProps;
-        bodyProps.position = { 0, 10, 0 };
+        bodyProps.position = { -20, 1, 0 };
         bodyProps.linVelocity = { 0, 0, 0 };
         bodyProps.angVelocity = { 0, 0, 0 };
-        bodyProps.massInv = 1.0f/20.f;
+        bodyProps.massInv = 1.0f/40.f;
         bodyProps.rotation = { 0, 0, 0, 1 };
         bodyProps.elasticity = 0.0f;
         XMFLOAT3 scales = { 1.0f, 1.0f, 1.0f};
         XMFLOAT4 color = { 1.0f,  1.0f,  1.0f, 1.0f };
-        AddBody(ShapeType::OrientedBox, bodyProps, scales, color);
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, false);
     }
-
+    // collider
+    {
+        BodyProperties bodyProps;
+        bodyProps.position = { 10, 7, 0 };
+        bodyProps.linVelocity = { 0, 0, 0 };
+        bodyProps.angVelocity = { 0, 0, 0 };
+        bodyProps.massInv = 1.0f / 20.f;
+        bodyProps.rotation = { 0, 0, 0, 1 };
+        bodyProps.elasticity = 0.5f;
+        XMFLOAT3 scales = { 1.0f, 1.0f, 1.0f };
+        XMFLOAT4 color = { 1.0f,  1.0f,  1.0f, 1.0f };
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, true);
+    }
 
     // floor
     {
         BodyProperties bodyProps;
-        bodyProps.position = { 0, 0, 0 };
+        bodyProps.position = { 0, -2, 0 };
         bodyProps.linVelocity = { 0, 0, 0 };
         bodyProps.angVelocity = { 0, 0, 0 };
         bodyProps.massInv = 0;
         bodyProps.rotation = { 0, 0, 0, 1 };
         bodyProps.elasticity = 1.0f;
-        XMFLOAT3 scales = { 35, 2, 35 };
+        XMFLOAT3 scales = { 35, 1, 35 };
         XMFLOAT4 color = { 0.2f, 0.5f, 0.1f, 1.0f };
-        AddBody(ShapeType::OrientedBox, bodyProps, scales, color);
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, true);
     }
     // left wall
     {
@@ -99,7 +111,7 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 1.0f;
         XMFLOAT3 scales = { 1, 20, 35 };
         XMFLOAT4 color = { 0.5f, 0.1f, 0.1f, 1.0f };
-        AddBody(ShapeType::OrientedBox, bodyProps, scales, color);
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, true);
     }
 
     // right wall
@@ -113,7 +125,7 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 1.0f;
         XMFLOAT3 scales = { 1, 20, 35 };
         XMFLOAT4 color = { 0.5f, 0.1f, 0.1f, 1.0f };
-        AddBody(ShapeType::OrientedBox, bodyProps, scales, color);
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, true);
     }
 
     // front wall
@@ -127,7 +139,7 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 1.0f;
         XMFLOAT3 scales = { 35, 20, 1 };
         XMFLOAT4 color = { 0.5f, 0.1f, 0.1f, 1.0f };
-        AddBody(ShapeType::OrientedBox, bodyProps, scales, color);
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, true);
     }
 
     // back wall
@@ -141,7 +153,22 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 1.0f;
         XMFLOAT3 scales = { 35, 20, 1 };
         XMFLOAT4 color = { 0.5f, 0.1f, 0.1f, 1.0f };
-        AddBody(ShapeType::OrientedBox, bodyProps, scales, color);
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, true);
+    }
+
+
+    // ramp
+    {
+        BodyProperties bodyProps;
+        bodyProps.position = { 0, 0, 0 };
+        bodyProps.linVelocity = { 0, 0, 0 };
+        bodyProps.angVelocity = { 0, 0, 0 };
+        bodyProps.massInv = 0;
+        bodyProps.rotation = { 0, 0, 1.0f * sinf(-3.14/9), cosf(-3.14 / 9)};
+        bodyProps.elasticity = 0.0f;
+        XMFLOAT3 scales = { 3, 1, 1 };
+        XMFLOAT4 color = { 0.5f, 0.1f, 0.1f, 1.0f };
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, true);
     }
 
 }
@@ -151,8 +178,8 @@ void Composer::UpdateObjects(
 {
     if (calculatePhysics)
     {
-        physicsEngine->AddForce(physicsEntities[characterId], characterImpulse);
-        characterImpulse = { 0, 0, 0 };
+        physicsEngine->SetLinearVelocity(physicsEntities[characterId], X_COMPONENT | Z_COMPONENT, characterVelocity);
+        characterVelocity = { 0, 0, 0 };
 
         physicsEngine->UpdateBodies(dt);
         if (frameMode)
@@ -203,10 +230,10 @@ void Composer::ProcessUserInput(
     if (window->IsKeyPressed(VK_CONTROL)) { eyeVec = XMVectorSubtract(eyeVec, XMVectorScale(upInitialVec, dt * 10.0f)); }
     if (window->IsKeyPressed('D')) { eyeVec = XMVectorAdd(eyeVec, XMVectorScale(XMVector3Cross(upVec, lookDirVec), dt * 10.0f)); }
     if (window->IsKeyPressed('A')) { eyeVec = XMVectorSubtract(eyeVec, XMVectorScale(XMVector3Cross(upVec, lookDirVec), dt * 10.0f)); }
-    if (window->IsKeyPressed(VK_UP)) { characterImpulse = { 0, 0, 10 }; }
-    if (window->IsKeyPressed(VK_DOWN)) { characterImpulse = { 0, 0, -10 }; }
-    if (window->IsKeyPressed(VK_LEFT)) { characterImpulse = { 10, 0, 0 }; }
-    if (window->IsKeyPressed(VK_RIGHT)) { characterImpulse = { -10, 0, 0 }; }
+    if (window->IsKeyPressed(VK_UP)) { characterVelocity.z += 10.0f; }
+    if (window->IsKeyPressed(VK_DOWN)) { characterVelocity.z += -10.0f; }
+    if (window->IsKeyPressed(VK_LEFT)) { characterVelocity.x += -10.0f; }
+    if (window->IsKeyPressed(VK_RIGHT)) { characterVelocity.x += 10.0f; }
     if (window->IsLeftPressed())
     {
         static float angleX = 0.0f, angleY = 0.0f;
@@ -258,7 +285,8 @@ void Composer::AddBody(
     const ShapeType& type,
     const BodyProperties& props,
     const DirectX::XMFLOAT3& scales, 
-    const DirectX::XMFLOAT4& color)
+    const DirectX::XMFLOAT4& color,
+    bool allowAngularImpulse)
 {
     uint64_t uboId;
     renderer->AllocateUboResource(uboPool, UBO_OBJ_TRSF_RESOURCE_TYPE, &uboId);
@@ -269,7 +297,7 @@ void Composer::AddBody(
     physicsEntitiesTrsfm.push_back({});
 
     bool isDynamic = props.massInv != 0.0f;
-    physicsEngine->AddBody(props, type, scales, isDynamic, &physicsEntities[entitySize]);
+    physicsEngine->AddBody(props, type, scales, isDynamic, &physicsEntities[entitySize], allowAngularImpulse);
     physicsEngine->GetTransformMatrixForBody(physicsEntities[entitySize], &physicsEntitiesTrsfm[entitySize].transform);
 
     physicsEntitiesTrsfm[entitySize].color[0] = color.x;

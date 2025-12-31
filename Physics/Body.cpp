@@ -93,13 +93,16 @@ void Body::ApplyImpulse(
 {
 	ApplyLinearImpulse(Impulse);
 
-	XMFLOAT3 CoM;
-	GetCenterOfMassWorldSpace(& CoM);
+	if (allowAngularImpulse)
+	{
+		XMFLOAT3 CoM;
+		GetCenterOfMassWorldSpace(&CoM);
 
-	XMVECTOR r = XMLoadFloat3(contactPoint) - XMLoadFloat3(&CoM);
-	XMFLOAT3 dL;
-	XMStoreFloat3(&dL, -1.0f * XMVector3Cross(r, XMLoadFloat3(Impulse)));
-	ApplyAngularImpulse(&dL);
+		XMVECTOR r = XMLoadFloat3(contactPoint) - XMLoadFloat3(&CoM);
+		XMFLOAT3 dL;
+		XMStoreFloat3(&dL, -1.0f * XMVector3Cross(r, XMLoadFloat3(Impulse)));
+		ApplyAngularImpulse(&dL);
+	}
 }
 
 void Body::GetCenterOfMassWorldSpace(
