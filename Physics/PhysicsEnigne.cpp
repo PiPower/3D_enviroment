@@ -353,10 +353,10 @@ int64_t PhysicsEnigne::UpdateBodies(float dt)
 		XMFLOAT3 Impulse;
 		XMStoreFloat3(&Impulse, v_Impulse);
 		body->ApplyLinearImpulse(&Impulse);
-
+	
 		dynamicForces[i] = { .0f, .0f, .0f };
 	}
-	
+
 	BroadPhase(dt);
 
 	FindIntersections(dt);

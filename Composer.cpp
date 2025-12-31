@@ -63,7 +63,7 @@ void Composer::GenerateObjects()
     // character
     {
         BodyProperties bodyProps;
-        bodyProps.position = { -20, 1, 0 };
+        bodyProps.position = { -2, 1.07f, 0 };
         bodyProps.linVelocity = { 0, 0, 0 };
         bodyProps.angVelocity = { 0, 0, 0 };
         bodyProps.massInv = 1.0f/40.f;
@@ -84,7 +84,7 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 0.5f;
         XMFLOAT3 scales = { 1.0f, 1.0f, 1.0f };
         XMFLOAT4 color = { 1.0f,  1.0f,  1.0f, 1.0f };
-        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, true);
+        //AddBody(ShapeType::OrientedBox, bodyProps, scales, color, true);
     }
 
     // floor
@@ -164,9 +164,9 @@ void Composer::GenerateObjects()
         bodyProps.linVelocity = { 0, 0, 0 };
         bodyProps.angVelocity = { 0, 0, 0 };
         bodyProps.massInv = 0;
-        bodyProps.rotation = { 0, 0, 1.0f * sinf(-3.14/9), cosf(-3.14 / 9)};
+        bodyProps.rotation = { 0, 0, 1.0f * sinf(-3.14/8), cosf(-3.14 / 8)};
         bodyProps.elasticity = 0.0f;
-        XMFLOAT3 scales = { 3, 1, 1 };
+        XMFLOAT3 scales = { 5, 1, 1 };
         XMFLOAT4 color = { 0.5f, 0.1f, 0.1f, 1.0f };
         AddBody(ShapeType::OrientedBox, bodyProps, scales, color, true);
     }
@@ -178,7 +178,7 @@ void Composer::UpdateObjects(
 {
     if (calculatePhysics)
     {
-        physicsEngine->SetLinearVelocity(physicsEntities[characterId], X_COMPONENT | Z_COMPONENT, characterVelocity);
+        physicsEngine->SetLinearVelocity(physicsEntities[characterId], X_COMPONENT | Y_COMPONENT, characterVelocity);
         characterVelocity = { 0, 0, 0 };
 
         physicsEngine->UpdateBodies(dt);
@@ -233,7 +233,7 @@ void Composer::ProcessUserInput(
     if (window->IsKeyPressed(VK_UP)) { characterVelocity.z += 10.0f; }
     if (window->IsKeyPressed(VK_DOWN)) { characterVelocity.z += -10.0f; }
     if (window->IsKeyPressed(VK_LEFT)) { characterVelocity.x += -10.0f; }
-    if (window->IsKeyPressed(VK_RIGHT)) { characterVelocity.x += 10.0f; }
+    if (window->IsKeyPressed(VK_RIGHT)) { characterVelocity.x += 5.0f; characterVelocity.y += 5.0f;}
     if (window->IsLeftPressed())
     {
         static float angleX = 0.0f, angleY = 0.0f;
