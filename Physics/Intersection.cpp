@@ -763,7 +763,7 @@ static bool HasPoint(
 
 static bool CoplanarTest(const Simplex& simplex)
 {
-	constexpr float eps = 0.001;
+	constexpr float eps = 0.0001;
 
 	XMVECTOR p0 = XMLoadFloat3(&simplex.ptOnSimplex[0]);
 	XMVECTOR p1 = XMLoadFloat3(&simplex.ptOnSimplex[1]);
@@ -772,7 +772,7 @@ static bool CoplanarTest(const Simplex& simplex)
 
 	XMVECTOR normal = XMVector3Normalize(XMVector3Cross(p0 - p1, p0 - p2));
 	float prod;
-	XMStoreFloat(&prod, XMVector3Dot(normal, p3));
+	XMStoreFloat(&prod, XMVector3Dot(normal, XMVector3Normalize(p3 - p0)));
 
 	return abs(prod) <= eps;
 }
