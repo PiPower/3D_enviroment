@@ -18,6 +18,13 @@ struct BodyProperties
 	float elasticity;
 };
 
+struct LinearVelocityBounds
+{
+	float x_min, x_max;
+	float y_min, y_max;
+	float z_min, z_max;
+};
+
 struct Body
 {
 	DirectX::XMFLOAT3 position;
@@ -27,6 +34,7 @@ struct Body
 	DirectX::XMFLOAT4 rotation;
 	DirectX::XMFLOAT3 angVelocity;
 	bool allowAngularImpulse;
+	LinearVelocityBounds vBounds;
 	Shape shape;
 
 	void UpdateBody(

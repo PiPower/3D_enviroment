@@ -17,8 +17,10 @@ Composer::Composer(
     :
     cameraAngleX(0), cameraAngleY(0), camOrientation(eyeInitial, upInitial, lookDirInitial), 
     renderer(renderer) , physicsEngine(physicsEngine), calculatePhysics(true), frameMode(true),
-    lights(lights), characterVelocity({0, 0, 0})
+    lights(lights), characterVelocity({ 0, 0, 0 }), onTheSurface(false), timeNotOnTheSurface(0.0f)
 {
+    XMStoreFloat4x4(&surfaceRotation, XMMatrixRotationX(0)); // init surface rotation to default matrix 
+
     vector<GeometryEntry> boxGeo({ GeometryType::Box });
     renderer->CreateMeshCollection(boxGeo, &boxCollection);
     renderer->CreateUboPool(sizeof(Camera) + lights.size() * sizeof(Light), sizeof(ObjectUbo), 300'000, &uboPool);
@@ -63,7 +65,7 @@ void Composer::GenerateObjects()
     // character
     {
         BodyProperties bodyProps;
-        bodyProps.position = { -2, 1.07f, 0 };
+        bodyProps.position = { -3, 1, 0 };
         bodyProps.linVelocity = { 0, 0, 0 };
         bodyProps.angVelocity = { 0, 0, 0 };
         bodyProps.massInv = 1.0f/40.f;
@@ -71,8 +73,10 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 0.0f;
         XMFLOAT3 scales = { 1.0f, 1.0f, 1.0f};
         XMFLOAT4 color = { 1.0f,  1.0f,  1.0f, 1.0f };
-        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, false);
+        LinearVelocityBounds bounds = { -2, 2, -500, 5, -2, 2 };
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, bounds, false);
     }
+    
     // collider
     {
         BodyProperties bodyProps;
@@ -98,7 +102,8 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 1.0f;
         XMFLOAT3 scales = { 35, 1, 35 };
         XMFLOAT4 color = { 0.2f, 0.5f, 0.1f, 1.0f };
-        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, true);
+        LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, bounds, true);
     }
     // left wall
     {
@@ -111,7 +116,8 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 1.0f;
         XMFLOAT3 scales = { 1, 20, 35 };
         XMFLOAT4 color = { 0.5f, 0.1f, 0.1f, 1.0f };
-        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, true);
+        LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, bounds, true);
     }
 
     // right wall
@@ -125,7 +131,8 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 1.0f;
         XMFLOAT3 scales = { 1, 20, 35 };
         XMFLOAT4 color = { 0.5f, 0.1f, 0.1f, 1.0f };
-        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, true);
+        LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, bounds, true);
     }
 
     // front wall
@@ -139,7 +146,8 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 1.0f;
         XMFLOAT3 scales = { 35, 20, 1 };
         XMFLOAT4 color = { 0.5f, 0.1f, 0.1f, 1.0f };
-        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, true);
+        LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, bounds, true);
     }
 
     // back wall
@@ -153,7 +161,8 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 1.0f;
         XMFLOAT3 scales = { 35, 20, 1 };
         XMFLOAT4 color = { 0.5f, 0.1f, 0.1f, 1.0f };
-        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, true);
+        LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, bounds, true);
     }
 
 
@@ -164,11 +173,13 @@ void Composer::GenerateObjects()
         bodyProps.linVelocity = { 0, 0, 0 };
         bodyProps.angVelocity = { 0, 0, 0 };
         bodyProps.massInv = 0;
-        bodyProps.rotation = { 0, 0, 1.0f * sinf(-3.14/8), cosf(-3.14 / 8)};
+        bodyProps.rotation = { 0, 0, 1.0f * sinf(-3.14/9.0), cosf(-3.14 / 9.0)};
         bodyProps.elasticity = 0.0f;
         XMFLOAT3 scales = { 5, 1, 1 };
         XMFLOAT4 color = { 0.5f, 0.1f, 0.1f, 1.0f };
-        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, true);
+        LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, bounds, true);
+        rampId = physicsEntities.size() - 1;
     }
 
 }
@@ -178,10 +189,17 @@ void Composer::UpdateObjects(
 {
     if (calculatePhysics)
     {
-        physicsEngine->SetLinearVelocity(physicsEntities[characterId], X_COMPONENT | Y_COMPONENT, characterVelocity);
+        physicsEngine->AddLinearVelocity(physicsEntities[characterId], X_COMPONENT | Y_COMPONENT | Z_COMPONENT, characterVelocity);
+        physicsEngine->UpdateBodies(dt);
+
+        XMFLOAT3 vel;
+        physicsEngine->GetLinearVelocity(physicsEntities[characterId], &vel);
+        if (characterVelocity.x == 0.0f) { vel.x *= 0.1; }
+        if (characterVelocity.y == 0.0f && vel.y > 0) { vel.y *= 0.1; }
+        if (characterVelocity.z == 0.0f) { vel.z *= 0.1; }
+        physicsEngine->SetLinearVelocity(physicsEntities[characterId], X_COMPONENT | Y_COMPONENT | Z_COMPONENT, vel);
         characterVelocity = { 0, 0, 0 };
 
-        physicsEngine->UpdateBodies(dt);
         if (frameMode)
         {
             calculatePhysics = false;
@@ -193,6 +211,24 @@ void Composer::UpdateObjects(
         physicsEngine->GetTransformMatrixForBody(physicsEntities[i], &physicsEntitiesTrsfm[i].transform);
         renderer->UpdateUboMemory(uboPool, renderEntities[i].transformUboId, (char*) &physicsEntitiesTrsfm[i].transform);
     }
+
+    onTheSurface = false;
+    timeNotOnTheSurface += dt;
+    for (int i = 0; i < physicsEngine->contactPoints.size() -1 ; i++)
+    {
+        if (physicsEngine->contactPoints[i].bodyA == physicsEngine->GetBody(physicsEntities[rampId]) ||
+            physicsEngine->contactPoints[i].bodyB == physicsEngine->GetBody(physicsEntities[rampId]) )
+        {
+            Body* body = physicsEngine->GetBody(physicsEntities[rampId]);
+            XMVECTOR rotationQuat = XMLoadFloat4(&body->rotation);
+            onTheSurface = true;
+
+            XMStoreFloat4x4(&surfaceRotation,
+                XMMatrixTranspose(XMMatrixRotationQuaternion(rotationQuat)));
+            timeNotOnTheSurface = 0;
+        }
+    }
+
 }
 
 
@@ -222,18 +258,41 @@ void Composer::ProcessUserInput(
         }
         event = window->ReadKeyEvent();
     }
-
-
+    
     if (window->IsKeyPressed('W')) { eyeVec = XMVectorAdd(eyeVec, XMVectorScale(lookDirVec, dt * 10.0f)); }
     if (window->IsKeyPressed('S')) { eyeVec = XMVectorSubtract(eyeVec, XMVectorScale(lookDirVec, dt * 10.0f)); }
     if (window->IsKeyPressed(VK_SPACE)) { eyeVec = XMVectorAdd(eyeVec, XMVectorScale(upInitialVec, dt * 10.0f)); }
     if (window->IsKeyPressed(VK_CONTROL)) { eyeVec = XMVectorSubtract(eyeVec, XMVectorScale(upInitialVec, dt * 10.0f)); }
     if (window->IsKeyPressed('D')) { eyeVec = XMVectorAdd(eyeVec, XMVectorScale(XMVector3Cross(upVec, lookDirVec), dt * 10.0f)); }
     if (window->IsKeyPressed('A')) { eyeVec = XMVectorSubtract(eyeVec, XMVectorScale(XMVector3Cross(upVec, lookDirVec), dt * 10.0f)); }
-    if (window->IsKeyPressed(VK_UP)) { characterVelocity.z += 10.0f; }
-    if (window->IsKeyPressed(VK_DOWN)) { characterVelocity.z += -10.0f; }
-    if (window->IsKeyPressed(VK_LEFT)) { characterVelocity.x += -10.0f; }
-    if (window->IsKeyPressed(VK_RIGHT)) { characterVelocity.x += 5.0f; characterVelocity.y += 5.0f;}
+    if (timeNotOnTheSurface < 0.05f)
+    {
+        if (window->IsKeyPressed(VK_UP))
+        {
+            XMStoreFloat3(&characterVelocity,
+                .2f * XMVector3Transform(XMVectorSet(0, 0, 1.0f, 0), XMLoadFloat4x4(&surfaceRotation)));
+        }
+        if (window->IsKeyPressed(VK_DOWN))
+        {
+            XMStoreFloat3(&characterVelocity,
+                -.2f * XMVector3Transform(XMVectorSet(0, 0, 1.0f, 0), XMLoadFloat4x4(&surfaceRotation)));
+        }
+        if (window->IsKeyPressed(VK_LEFT))
+        {
+            XMStoreFloat3(&characterVelocity,
+                -.2f * XMVector3Transform(XMVectorSet(1.0f, 0, 0, 0), XMLoadFloat4x4(&surfaceRotation)));
+        }
+        if (window->IsKeyPressed(VK_RIGHT))
+        {
+            XMStoreFloat3(&characterVelocity,
+                .2f * XMVector3Transform(XMVectorSet(1.0f, 0, 0, 0), XMLoadFloat4x4(&surfaceRotation)));
+        }
+    }
+    else
+    {
+        XMStoreFloat4x4(&surfaceRotation, XMMatrixRotationX(0));
+    }
+
     if (window->IsLeftPressed())
     {
         static float angleX = 0.0f, angleY = 0.0f;
@@ -284,8 +343,9 @@ void Composer::ProcessUserInput(
 void Composer::AddBody(
     const ShapeType& type,
     const BodyProperties& props,
-    const DirectX::XMFLOAT3& scales, 
+    const DirectX::XMFLOAT3& scales,
     const DirectX::XMFLOAT4& color,
+    const LinearVelocityBounds& vBounds,
     bool allowAngularImpulse)
 {
     uint64_t uboId;
@@ -297,7 +357,7 @@ void Composer::AddBody(
     physicsEntitiesTrsfm.push_back({});
 
     bool isDynamic = props.massInv != 0.0f;
-    physicsEngine->AddBody(props, type, scales, isDynamic, &physicsEntities[entitySize], allowAngularImpulse);
+    physicsEngine->AddBody(props, type, scales, isDynamic, &physicsEntities[entitySize], allowAngularImpulse, vBounds);
     physicsEngine->GetTransformMatrixForBody(physicsEntities[entitySize], &physicsEntitiesTrsfm[entitySize].transform);
 
     physicsEntitiesTrsfm[entitySize].color[0] = color.x;

@@ -38,9 +38,9 @@ struct Composer
 		const BodyProperties& props,
 		const DirectX::XMFLOAT3& scales, 
 		const DirectX::XMFLOAT4& color,
+		const LinearVelocityBounds& vBounds,
 		bool allowAngularImpulse);
 public:
-	DirectX::XMFLOAT3 characterVelocity;
 	Renderer* renderer;
 	PhysicsEnigne* physicsEngine;
 	float cameraAngleX;
@@ -49,6 +49,12 @@ public:
 	uint64_t uboPool;
 	bool calculatePhysics;
 	bool frameMode;
+	// ----- character management ----- 
+	DirectX::XMFLOAT3 characterVelocity;
+	DirectX::XMFLOAT4X4 surfaceRotation;
+	uint64_t rampId;
+	bool onTheSurface;
+	float timeNotOnTheSurface;
 	// ----- Entity related -----
 	std::vector<uint64_t> physicsEntities;
 	std::vector<ObjectUbo> physicsEntitiesTrsfm;

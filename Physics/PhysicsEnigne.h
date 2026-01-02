@@ -32,6 +32,7 @@ struct PhysicsEnigne
 		bool isDynamic, 
 		uint64_t* bodyId,
 		bool allowAngularImpulse,
+		const LinearVelocityBounds& vBounds,
 		DirectX::XMFLOAT3 constForce = {0, -9.8, 0});
 	
 	int64_t GetTransformMatrixForBody(
@@ -49,6 +50,15 @@ struct PhysicsEnigne
 		const DirectX::XMFLOAT3& Force);
 
 	void SetLinearVelocity(
+		uint64_t bodyId,
+		uint8_t	velocityComponent,
+		const DirectX::XMFLOAT3& v);
+
+	void GetLinearVelocity(
+		uint64_t bodyId,
+		DirectX::XMFLOAT3* v);
+
+	void AddLinearVelocity(
 		uint64_t bodyId,
 		uint8_t	velocityComponent,
 		const DirectX::XMFLOAT3& v);
@@ -84,6 +94,8 @@ struct PhysicsEnigne
 		size_t bodyId);
 
 	void BuildCollisionPairs();
+
+	
 
 public:
 	std::vector<Body> staticBodies;

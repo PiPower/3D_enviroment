@@ -420,7 +420,7 @@ static float EpaContactInfo(
 		}
 		float dist = SignedDistanceToSurface(&points[tri.a].ptOnSimplex,
 				&points[tri.b].ptOnSimplex, &points[tri.c].ptOnSimplex, &suppPoint.ptOnSimplex);
-		if (dist <= 0.0f) 
+		if (dist <= 0.00002f) 
 		{
 			break;	// can't expand
 		}
@@ -770,7 +770,7 @@ static bool CoplanarTest(const Simplex& simplex)
 	XMVECTOR p2 = XMLoadFloat3(&simplex.ptOnSimplex[2]);
 	XMVECTOR p3 = XMLoadFloat3(&simplex.ptOnSimplex[3]);
 
-	XMVECTOR normal = XMVector3Normalize(XMVector3Cross(p0 - p1, p0 - p2));
+	XMVECTOR normal = XMVector3Normalize(XMVector3Cross(p1 - p0, p2 - p0));
 	float prod;
 	XMStoreFloat(&prod, XMVector3Dot(normal, XMVector3Normalize(p3 - p0)));
 

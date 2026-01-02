@@ -73,6 +73,33 @@ void PhysicsEnigne::SetLinearVelocity(
 	return;
 }
 
+void PhysicsEnigne::GetLinearVelocity(
+	uint64_t bodyId, 
+	DirectX::XMFLOAT3* v)
+{
+	if ((bodyId & BODY_STATIC_FLAG) > 0)
+	{
+		return;
+	}
+	*v = dynamicBodies[bodyId - 1].linVelocity;
+}
+
+void PhysicsEnigne::AddLinearVelocity(
+	uint64_t bodyId,
+	uint8_t velocityComponent, 
+	const DirectX::XMFLOAT3& v)
+{
+	if ((bodyId & BODY_STATIC_FLAG) > 0)
+	{
+		return;
+	}
+
+	if ((velocityComponent & X_COMPONENT) > 0) { dynamicBodies[bodyId - 1].linVelocity.x += v.x; }
+	if ((velocityComponent & Y_COMPONENT) > 0) { dynamicBodies[bodyId - 1].linVelocity.y += v.y; }
+	if ((velocityComponent & Z_COMPONENT) > 0) { dynamicBodies[bodyId - 1].linVelocity.z += v.z; }
+	return;
+}
+
 Body* PhysicsEnigne::GetBody(
 	uint64_t bodyId)
 {
@@ -286,6 +313,7 @@ int64_t PhysicsEnigne::AddBody(
 	bool isDynamic,
 	uint64_t* bodyId,
 	bool allowAngularImpulse,
+	const LinearVelocityBounds& vBounds,
 	DirectX::XMFLOAT3 constForce)
 {
 	Body body;
@@ -296,6 +324,7 @@ int64_t PhysicsEnigne::AddBody(
 	body.rotation = props.rotation;
 	body.elasticity = props.elasticity;
 	body.allowAngularImpulse = allowAngularImpulse;
+	body.vBounds = vBounds;
 	body.shape = CreateDefaultShape(shapeType, scales);
 
 	if (isDynamic)
