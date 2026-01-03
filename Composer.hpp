@@ -3,7 +3,7 @@
 #include <DirectXMath.h>
 #include "Renderer//Renderer.hpp"
 #include "Physics/PhysicsEnigne.h"
-
+#include <set>
 struct  CameraOrientation
 {
 	DirectX::XMFLOAT3 eye;
@@ -51,8 +51,13 @@ public:
 	bool frameMode;
 	// ----- character management ----- 
 	DirectX::XMFLOAT3 characterVelocity;
+	DirectX::XMFLOAT3 characterVelocityCoeff;
+	DirectX::XMFLOAT3 orientationDir;
+	DirectX::XMFLOAT3 forwardDir;
+	DirectX::XMFLOAT3 rightDir;
+	DirectX::XMFLOAT3 upDir;
 	DirectX::XMFLOAT4X4 surfaceRotation;
-	uint64_t rampId;
+	std::vector<uint64_t> walkableSurface;
 	bool onTheSurface;
 	float timeNotOnTheSurface;
 	// ----- Entity related -----

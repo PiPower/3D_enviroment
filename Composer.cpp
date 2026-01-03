@@ -15,9 +15,11 @@ Composer::Composer(
     PhysicsEnigne* physicsEngine,
     const std::vector<Light>& lights)
     :
-    cameraAngleX(0), cameraAngleY(0), camOrientation(eyeInitial, upInitial, lookDirInitial), 
-    renderer(renderer) , physicsEngine(physicsEngine), calculatePhysics(true), frameMode(true),
-    lights(lights), characterVelocity({ 0, 0, 0 }), onTheSurface(false), timeNotOnTheSurface(0.0f)
+    cameraAngleX(0), cameraAngleY(0), camOrientation(eyeInitial, upInitial, lookDirInitial),
+    renderer(renderer), physicsEngine(physicsEngine), calculatePhysics(true), frameMode(true),
+    lights(lights), characterVelocity({ 0, 0, 0 }), onTheSurface(false), timeNotOnTheSurface(0.0f),
+    orientationDir({ 0, 0, 1 }), forwardDir({ 0, 0, 1 }), upDir({ 0,1,0 }), rightDir({ 1,0,0 }),
+    characterVelocityCoeff({ 400, 400, 400 })
 {
     XMStoreFloat4x4(&surfaceRotation, XMMatrixRotationX(0)); // init surface rotation to default matrix 
 
@@ -73,7 +75,7 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 0.0f;
         XMFLOAT3 scales = { 1.0f, 1.0f, 1.0f};
         XMFLOAT4 color = { 1.0f,  1.0f,  1.0f, 1.0f };
-        LinearVelocityBounds bounds = { -2, 2, -500, 5, -2, 2 };
+        LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
         AddBody(ShapeType::OrientedBox, bodyProps, scales, color, bounds, false);
     }
     
@@ -104,6 +106,7 @@ void Composer::GenerateObjects()
         XMFLOAT4 color = { 0.2f, 0.5f, 0.1f, 1.0f };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
         AddBody(ShapeType::OrientedBox, bodyProps, scales, color, bounds, true);
+        walkableSurface.push_back(physicsEntities.back());
     }
     // left wall
     {
@@ -179,7 +182,7 @@ void Composer::GenerateObjects()
         XMFLOAT4 color = { 0.5f, 0.1f, 0.1f, 1.0f };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
         AddBody(ShapeType::OrientedBox, bodyProps, scales, color, bounds, true);
-        rampId = physicsEntities.size() - 1;
+        walkableSurface.push_back(physicsEntities.back());
     }
 
 }
@@ -189,7 +192,12 @@ void Composer::UpdateObjects(
 {
     if (calculatePhysics)
     {
-        physicsEngine->AddLinearVelocity(physicsEntities[characterId], X_COMPONENT | Y_COMPONENT | Z_COMPONENT, characterVelocity);
+
+        XMFLOAT3 velocity;
+        XMStoreFloat3(&velocity,
+            characterVelocity.z * XMLoadFloat3(&forwardDir) + characterVelocity.x * XMLoadFloat3(&rightDir));
+
+        physicsEngine->AddLinearVelocity(physicsEntities[characterId], X_COMPONENT | Y_COMPONENT | Z_COMPONENT, velocity);
         physicsEngine->UpdateBodies(dt);
 
         XMFLOAT3 vel;
@@ -214,21 +222,31 @@ void Composer::UpdateObjects(
 
     onTheSurface = false;
     timeNotOnTheSurface += dt;
-    for (int i = 0; i < physicsEngine->contactPoints.size() -1 ; i++)
+    for (size_t i = 0; i < physicsEngine->contactPoints.size() -1 ; i++)
     {
-        if (physicsEngine->contactPoints[i].bodyA == physicsEngine->GetBody(physicsEntities[rampId]) ||
-            physicsEngine->contactPoints[i].bodyB == physicsEngine->GetBody(physicsEntities[rampId]) )
+        for (size_t j = 0; j < walkableSurface.size(); j++)
         {
-            Body* body = physicsEngine->GetBody(physicsEntities[rampId]);
-            XMVECTOR rotationQuat = XMLoadFloat4(&body->rotation);
-            onTheSurface = true;
+            Body* surface = physicsEngine->GetBody(walkableSurface[j]);
+            if (physicsEngine->contactPoints[i].bodyA == surface ||
+                physicsEngine->contactPoints[i].bodyB == surface)
+            {
+                Contact *contact = &physicsEngine->contactPoints[i];
 
-            XMStoreFloat4x4(&surfaceRotation,
-                XMMatrixTranspose(XMMatrixRotationQuaternion(rotationQuat)));
-            timeNotOnTheSurface = 0;
+                upDir = contact->normal;
+                XMVECTOR v_upDir = XMLoadFloat3(&upDir);
+                XMVECTOR v_orientation = XMLoadFloat3(&orientationDir);
+                XMVECTOR v_forwardDir = XMVector3Normalize(v_orientation - XMVector3Dot(v_orientation, v_upDir));
+                XMStoreFloat3(&forwardDir, v_forwardDir);
+                XMStoreFloat3(&rightDir, XMVector3Normalize(XMVector3Cross(v_upDir, v_forwardDir) ) );
+                timeNotOnTheSurface = 0;
+
+                goto end_of_loop;
+            }
         }
     }
 
+end_of_loop:
+    return;
 }
 
 
@@ -269,23 +287,19 @@ void Composer::ProcessUserInput(
     {
         if (window->IsKeyPressed(VK_UP))
         {
-            XMStoreFloat3(&characterVelocity,
-                .2f * XMVector3Transform(XMVectorSet(0, 0, 1.0f, 0), XMLoadFloat4x4(&surfaceRotation)));
+            characterVelocity.z += characterVelocityCoeff.z * dt;
         }
         if (window->IsKeyPressed(VK_DOWN))
         {
-            XMStoreFloat3(&characterVelocity,
-                -.2f * XMVector3Transform(XMVectorSet(0, 0, 1.0f, 0), XMLoadFloat4x4(&surfaceRotation)));
+            characterVelocity.z -= characterVelocityCoeff.z * dt;
         }
         if (window->IsKeyPressed(VK_LEFT))
         {
-            XMStoreFloat3(&characterVelocity,
-                -.2f * XMVector3Transform(XMVectorSet(1.0f, 0, 0, 0), XMLoadFloat4x4(&surfaceRotation)));
+            characterVelocity.x += characterVelocityCoeff.x * dt;
         }
         if (window->IsKeyPressed(VK_RIGHT))
         {
-            XMStoreFloat3(&characterVelocity,
-                .2f * XMVector3Transform(XMVectorSet(1.0f, 0, 0, 0), XMLoadFloat4x4(&surfaceRotation)));
+            characterVelocity.x -= characterVelocityCoeff.x * dt;
         }
     }
     else
