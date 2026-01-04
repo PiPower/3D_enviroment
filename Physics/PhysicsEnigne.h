@@ -25,15 +25,16 @@ struct PhysicsEnigne
 {
 	PhysicsEnigne(size_t expectedDynamicBodies = 200, size_t expectedStaticBodies = 200);
 
+
 	int64_t AddBody(
 		const BodyProperties& props,
 		ShapeType shapeType,
-		DirectX::XMFLOAT3 scales,
+		const DirectX::XMFLOAT3& scales,
 		bool isDynamic, 
 		uint64_t* bodyId,
 		bool allowAngularImpulse,
 		const LinearVelocityBounds& vBounds,
-		DirectX::XMFLOAT3 constForce = {0, -9.8, 0});
+		const DirectX::XMFLOAT3& constForce = {0, -9.8, 0});
 	
 	int64_t GetTransformMatrixForBody(
 		uint64_t bodyId,
@@ -62,6 +63,12 @@ struct PhysicsEnigne
 		uint64_t bodyId,
 		uint8_t	velocityComponent,
 		const DirectX::XMFLOAT3& v);
+
+	void GetDistanceBetweenBodies(
+		uint64_t idBodyA,
+		uint64_t idBodyB,
+		float* dist);
+
 
 	Body* GetBody(
 		uint64_t bodyId);

@@ -18,3 +18,10 @@ bool CheckIntersection(
 	Body* bodyB,
 	Contact* contact,
 	float dt);
+
+void DistanceBetweenBodies(
+	Body* bodyA,
+	Body* bodyB,
+	DirectX::XMFLOAT3* ptOnA,
+	DirectX::XMFLOAT3* ptOnB,
+	float* dist);

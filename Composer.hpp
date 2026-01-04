@@ -59,8 +59,8 @@ public:
 	DirectX::XMFLOAT3 upDir;
 	DirectX::XMFLOAT3 constForce;
 	std::vector<uint64_t> walkableSurface;
-	bool onTheSurface;
-	float timeNotOnTheSurface;
+	uint64_t lastSurface;
+	uint64_t characterId;
 	float dragCoeff;
 	bool freeFall;
 	// ----- Entity related -----

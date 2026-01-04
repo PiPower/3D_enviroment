@@ -4,11 +4,11 @@
 using namespace DirectX;
 using namespace std;
 
+static constexpr XMFLOAT3 gravityForce = { 0, -10, 0 };
 static constexpr XMFLOAT3 eyeInitial = { -10.0f, 9.0f, -25.0f };
 static constexpr XMFLOAT3 lookDirInitial = { 0.0f, 0.0f, 1.0f };
 static constexpr XMFLOAT3 upInitial = { 0.0f, 1.0f, 0.0f };
 static constexpr uint64_t graphicsPipelineType = (uint64_t)PipelineTypes::Graphics;
-static constexpr size_t characterId = 0;
 
 Composer::Composer(
     Renderer* renderer,
@@ -17,9 +17,9 @@ Composer::Composer(
     :
     cameraAngleX(0), cameraAngleY(0), camOrientation(eyeInitial, upInitial, lookDirInitial),
     renderer(renderer), physicsEngine(physicsEngine), calculatePhysics(true), frameMode(true),
-    lights(lights), characterVelocity({ 0, 0, 0 }), onTheSurface(false), timeNotOnTheSurface(0.0f),
+    lights(lights), characterVelocity({ 0, 0, 0 }), constForce(gravityForce), dragCoeff(1.0f),
     orientationDir({ 0, 0, 1 }), forwardDir({ 0, 0, 1 }), upDir({ 0,1,0 }), rightDir({ 1,0,0 }),
-    characterVelocityCoeff({ 400000, 400000, 400000 }), constForce({0, 0, 0}), dragCoeff(1.0f)
+    characterVelocityCoeff({ 400000, 400000, 400000 }), freeFall(true)
 {
 
     vector<GeometryEntry> boxGeo({ GeometryType::Box });
@@ -73,10 +73,11 @@ void Composer::GenerateObjects()
         bodyProps.rotation = { 0, 0, 0, 1 };
         bodyProps.elasticity = 0.0f;
         bodyProps.friction = 1.0f;
-        XMFLOAT3 scales = { 0.3f, 0.3f, 0.3f};
+        XMFLOAT3 scales = { 0.5f, 0.5f, 0.5f};
         XMFLOAT4 color = { 1.0f,  1.0f,  1.0f, 1.0f };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
-        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, bounds, false);
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, bounds, false, { 0, 0, 0 });
+        characterId = physicsEntities.back();
     }
     
     // collider
@@ -182,7 +183,8 @@ void Composer::GenerateObjects()
         bodyProps.linVelocity = { 0, 0, 0 };
         bodyProps.angVelocity = { 0, 0, 0 };
         bodyProps.massInv = 0;
-        bodyProps.rotation = { 0, 0, 1.0f * sinf(-3.14/12.0), cosf(-3.14 / 12.0)};
+        float angle = -3.14f / 6.0f;
+        bodyProps.rotation = { 0, 0, 1.0f * sinf(angle/2.0f), cosf(angle/ 2.0f)};
         bodyProps.elasticity = 0.0f;
         bodyProps.friction = 1.0f;
         XMFLOAT3 scales = { 5, 1, 1 };
@@ -206,18 +208,18 @@ void Composer::UpdateObjects(
         XMStoreFloat3(&velocity,
             characterVelocity.z * XMLoadFloat3(&forwardDir) + characterVelocity.x * XMLoadFloat3(&rightDir));
         moved = characterVelocity.x != 0 || characterVelocity.z != 0 || characterVelocity.y != 0;
-         physicsEngine->AddForce(physicsEntities[characterId], X_COMPONENT | Y_COMPONENT | Z_COMPONENT, constForce);
-        physicsEngine->AddForce(physicsEntities[characterId], X_COMPONENT | Y_COMPONENT | Z_COMPONENT, velocity);
+         physicsEngine->AddForce(characterId, X_COMPONENT | Y_COMPONENT | Z_COMPONENT, constForce);
+        physicsEngine->AddForce(characterId, X_COMPONENT | Y_COMPONENT | Z_COMPONENT, velocity);
         
         physicsEngine->UpdateBodies(dt);
 
         characterVelocity = { 0, 0, 0 };
 
-        physicsEngine->GetLinearVelocity(physicsEntities[characterId], &velocity);
+        physicsEngine->GetLinearVelocity(characterId, &velocity);
         velocity.x *= dragCoeff;
         velocity.y *= dragCoeff;
         velocity.z *= dragCoeff;
-        physicsEngine->SetLinearVelocity(physicsEntities[characterId], X_COMPONENT | Y_COMPONENT | Z_COMPONENT, velocity);
+        physicsEngine->SetLinearVelocity(characterId, X_COMPONENT | Y_COMPONENT | Z_COMPONENT, velocity);
 
         //if (characterVelocity.x == 0.0f) { vel.x *= 0.1; }
         //if (characterVelocity.y == 0.0f && vel.y > 0) { vel.y *= 0.1; }
@@ -237,9 +239,6 @@ void Composer::UpdateObjects(
         renderer->UpdateUboMemory(uboPool, renderEntities[i].transformUboId, (char*) &physicsEntitiesTrsfm[i].transform);
     }
 
-    onTheSurface = false;
-    timeNotOnTheSurface += dt;
-
     size_t i;
     for (i = 0; i < physicsEngine->contactPoints.size() -1 ; i++)
     {
@@ -257,9 +256,8 @@ void Composer::UpdateObjects(
                 XMVECTOR v_forwardDir = XMVector3Normalize(v_orientation - XMVector3Dot(v_orientation, v_upDir));
                 XMStoreFloat3(&forwardDir, v_forwardDir);
                 XMStoreFloat3(&rightDir, XMVector3Normalize(XMVector3Cross(v_upDir, v_forwardDir) ) );
-                timeNotOnTheSurface = 0;
-                
-                constForce = { 0, 15, 0}; // character is on inclined object so disable gravity
+                lastSurface = walkableSurface[j];
+                constForce = { 0, 0, 0}; // character is on inclined object so disable gravity
                 dragCoeff = 0.4;
                 freeFall = false;
                 goto end_of_loop;
@@ -268,19 +266,23 @@ void Composer::UpdateObjects(
     }
 
 end_of_loop:
-    if (i == physicsEngine->contactPoints.size() - 1 )
-    {
- 
-        constForce = { 0, 0, 0 };
-        dragCoeff = 1.0f;
 
-        upDir = { 0, 1.0f, 0.0f };
-        forwardDir = orientationDir;
-        XMVECTOR v_upDir = XMLoadFloat3(&upDir);
-        XMVECTOR v_orientation = XMLoadFloat3(&orientationDir);
-        XMStoreFloat3(&rightDir, XMVector3Normalize(XMVector3Cross(v_orientation, v_upDir)));
-        
-        
+    if (!freeFall && i == physicsEngine->contactPoints.size() - 1)
+    {
+        float dist;
+        physicsEngine->GetDistanceBetweenBodies(characterId, lastSurface, &dist);
+        if (dist > 5)
+        {
+            constForce = gravityForce;
+            dragCoeff = 1.0f;
+            
+            upDir = { 0, 1.0f, 0.0f };
+            forwardDir = orientationDir;
+            XMVECTOR v_upDir = XMLoadFloat3(&upDir);
+            XMVECTOR v_orientation = XMLoadFloat3(&orientationDir);
+            XMStoreFloat3(&rightDir, XMVector3Normalize(XMVector3Cross(v_orientation, v_upDir)));
+            freeFall = true;
+        }
     }
 
     return;

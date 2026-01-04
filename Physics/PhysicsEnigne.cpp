@@ -100,6 +100,14 @@ void PhysicsEnigne::AddLinearVelocity(
 	return;
 }
 
+void PhysicsEnigne::GetDistanceBetweenBodies(
+	uint64_t idBodyA,
+	uint64_t idBodyB,
+	float* dist)
+{
+	DistanceBetweenBodies(GetBody(idBodyA), GetBody(idBodyB), nullptr, nullptr, dist);
+}
+
 Body* PhysicsEnigne::GetBody(
 	uint64_t bodyId)
 {
@@ -109,7 +117,7 @@ Body* PhysicsEnigne::GetBody(
 	}
 	else 
 	{ 
-		return &dynamicBodies[(bodyId & ~BODY_STATIC_FLAG) - 1];
+		return &dynamicBodies[bodyId - 1];
 	}
 }
 
@@ -329,10 +337,11 @@ void PhysicsEnigne::BuildCollisionPairs()
 }
 
 
+
 int64_t PhysicsEnigne::AddBody(
 	const BodyProperties& props,
 	ShapeType shapeType,
-	DirectX::XMFLOAT3 scales,
+	const DirectX::XMFLOAT3& scales,
 	bool isDynamic,
 	uint64_t* bodyId,
 	bool allowAngularImpulse,

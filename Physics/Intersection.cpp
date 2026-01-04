@@ -962,3 +962,108 @@ bool CheckIntersection(
 
 	return false;
 }
+
+static void GjkClosestDistance(
+	Body* bodyA,
+	Body* bodyB,
+	XMFLOAT3* ptOnA,
+	XMFLOAT3* ptOnB,
+	float bias)
+{
+	constexpr float epsilon = 0.0001;
+	constexpr uint8_t maxIters = 10;
+
+	Simplex simplex;
+	XMFLOAT3 dir = { 0, 1, 0 };
+	float lambdas[4] = {};
+	SupportPoint support;
+	uint8_t iterCount = 0;
+
+	GetSupport(bodyA, bodyB, &dir, &support, bias);
+	simplex.AddSupport(&support);
+	XMVECTOR vecDir = XMLoadFloat3(&simplex.ptOnSimplex[0]) * -1.0f;
+	XMStoreFloat3(&dir, vecDir);
+
+	float closestDistSq = simplex.ptOnSimplex[0].x * simplex.ptOnSimplex[0].x +
+		simplex.ptOnSimplex[0].y * simplex.ptOnSimplex[0].y +
+		simplex.ptOnSimplex[0].z * simplex.ptOnSimplex[0].z;
+
+	while (iterCount < maxIters && simplex.idxCount < 4)
+	{
+		vecDir = XMLoadFloat3(&dir);
+		GetSupport(bodyA, bodyB, &dir, &support, bias);
+		if (HasPoint(&simplex, &support))
+		{
+			break;
+		}
+		simplex.AddSupport(&support);
+
+		DistanceSubalgorithm(&simplex, lambdas, &dir);
+		float newDistSq = dir.x * dir.x + dir.y * dir.y + dir.z * dir.z;
+
+		if (newDistSq > closestDistSq)
+		{
+			break;
+		}
+
+		// sort by lamdas
+		int8_t last = simplex.idxCount - 1;
+		for (int8_t i = simplex.idxCount - 1; i >= 0; i--)
+		{
+			if (lambdas[i] == 0.0f)
+			{
+				for (int8_t j = i + 1; j <= last; j++)
+				{
+					simplex.SwapSupports(j - 1, j);
+				}
+				last--;
+			}
+		}
+		simplex.idxCount = last + 1;
+
+
+		closestDistSq = newDistSq;
+		iterCount++;
+	}
+
+	XMVECTOR v_ptOnA = XMVectorZero();
+	XMVECTOR v_ptOnB = XMVectorZero();
+	for (int i = 0; i < simplex.idxCount; i++)
+	{
+		v_ptOnA += XMLoadFloat3(&simplex.ptOnA[i]) * lambdas[i];
+		v_ptOnB += XMLoadFloat3(&simplex.ptOnB[i]) * lambdas[i];
+	}
+
+	XMStoreFloat3(ptOnA, v_ptOnA);
+	XMStoreFloat3(ptOnB, v_ptOnB);
+	return;
+}
+
+void DistanceBetweenBodies(
+	Body* bodyA, 
+	Body* bodyB,
+	DirectX::XMFLOAT3* ptOnA,
+	DirectX::XMFLOAT3* ptOnB,
+	float* dist)
+{
+	XMFLOAT3 a, b;
+	GjkClosestDistance(bodyA, bodyB, &a, &b, 0.001);
+
+	if (ptOnA)
+	{
+		*ptOnA = a;
+	}
+
+	if (ptOnB)
+	{
+		*ptOnB = b;
+	}
+
+	if (dist)
+	{
+		XMStoreFloat(dist,
+			XMVector3Length(XMLoadFloat3(&a) - XMLoadFloat3(&b)));
+	}
+
+	return;
+}
