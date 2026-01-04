@@ -58,10 +58,10 @@ public:
 	DirectX::XMFLOAT3 rightDir;
 	DirectX::XMFLOAT3 upDir;
 	DirectX::XMFLOAT3 constForce;
+	DirectX::XMFLOAT3 dragCoeff;
 	std::vector<uint64_t> walkableSurface;
 	uint64_t lastSurface;
 	uint64_t characterId;
-	float dragCoeff;
 	bool freeFall;
 	// ----- Entity related -----
 	std::vector<uint64_t> physicsEntities;

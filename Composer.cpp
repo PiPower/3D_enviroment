@@ -4,7 +4,7 @@
 using namespace DirectX;
 using namespace std;
 
-static constexpr XMFLOAT3 gravityForce = { 0, -10, 0 };
+static constexpr XMFLOAT3 gravityForce = { 0, -15, 0 };
 static constexpr XMFLOAT3 eyeInitial = { -10.0f, 9.0f, -25.0f };
 static constexpr XMFLOAT3 lookDirInitial = { 0.0f, 0.0f, 1.0f };
 static constexpr XMFLOAT3 upInitial = { 0.0f, 1.0f, 0.0f };
@@ -17,9 +17,9 @@ Composer::Composer(
     :
     cameraAngleX(0), cameraAngleY(0), camOrientation(eyeInitial, upInitial, lookDirInitial),
     renderer(renderer), physicsEngine(physicsEngine), calculatePhysics(true), frameMode(true),
-    lights(lights), characterVelocity({ 0, 0, 0 }), constForce(gravityForce), dragCoeff(1.0f),
+    lights(lights), characterVelocity({ 0, 0, 0 }), constForce(gravityForce), dragCoeff({ 0.5f, 1.0f, 0.5f }),
     orientationDir({ 0, 0, 1 }), forwardDir({ 0, 0, 1 }), upDir({ 0,1,0 }), rightDir({ 1,0,0 }),
-    characterVelocityCoeff({ 400, 400, 400 }), freeFall(true)
+    characterVelocityCoeff({ 25000, 25000, 25000 }), freeFall(true)
 {
 
     vector<GeometryEntry> boxGeo({ GeometryType::Box });
@@ -205,7 +205,7 @@ void Composer::UpdateObjects(
 
         XMFLOAT3 velocity;
         XMStoreFloat3(&velocity,
-            characterVelocity.z * XMLoadFloat3(&forwardDir) + characterVelocity.x * XMLoadFloat3(&rightDir) * 100.0f);
+            characterVelocity.z * XMLoadFloat3(&forwardDir) + characterVelocity.x * XMLoadFloat3(&rightDir));
 
   
         physicsEngine->AddForce(characterId, X_COMPONENT | Y_COMPONENT | Z_COMPONENT, constForce);
@@ -216,9 +216,9 @@ void Composer::UpdateObjects(
         characterVelocity = { 0, 0, 0 };
 
         physicsEngine->GetLinearVelocity(characterId, &velocity);
-        velocity.x *= dragCoeff;
-        velocity.y *= dragCoeff;
-        velocity.z *= dragCoeff;
+        velocity.x *= dragCoeff.x;
+        velocity.y *= dragCoeff.y;
+        velocity.z *= dragCoeff.z;
         physicsEngine->SetLinearVelocity(characterId, X_COMPONENT | Y_COMPONENT | Z_COMPONENT, velocity);
 
         //if (characterVelocity.x == 0.0f) { vel.x *= 0.1; }
@@ -258,7 +258,7 @@ void Composer::UpdateObjects(
                 XMStoreFloat3(&rightDir, XMVector3Normalize(XMVector3Cross(v_upDir, v_forwardDir) ) );
                 lastSurface = walkableSurface[j];
                 constForce = { 0, 0, 0}; // character is on inclined object so disable gravity
-                dragCoeff = 0.4;
+                dragCoeff = { 0.99, 0.99, 0.99 };
                 freeFall = false;
                 goto end_of_loop;
             }
@@ -273,17 +273,17 @@ end_of_loop:
         float dist;
         physicsEngine->GetDistanceBetweenBodies(characterId, lastSurface, &dist);
 
-        if (dist > 0.1)
+        if (dist > 0.01)
         {
             constForce = gravityForce;
-            dragCoeff = 1.0f;
+            dragCoeff = { 0.7f, 1.0f, 0.7f };
             
             upDir = { 0, 1.0f, 0.0f };
             forwardDir = orientationDir;
             XMVECTOR v_upDir = XMLoadFloat3(&upDir);
             XMVECTOR v_orientation = XMLoadFloat3(&orientationDir);
             XMStoreFloat3(&rightDir, XMVector3Normalize(XMVector3Cross(v_orientation, v_upDir)));
-            freeFall = true;
+   
         }
     }
 
