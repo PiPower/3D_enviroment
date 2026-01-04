@@ -16,6 +16,7 @@ struct BodyProperties
 	DirectX::XMFLOAT3 angVelocity;
 	float massInv;
 	float elasticity;
+	float friction;
 };
 
 struct LinearVelocityBounds
@@ -29,8 +30,9 @@ struct Body
 {
 	DirectX::XMFLOAT3 position;
 	float elasticity;
-	DirectX::XMFLOAT3 linVelocity;
 	float massInv;
+	float friction;
+	DirectX::XMFLOAT3 linVelocity;
 	DirectX::XMFLOAT4 rotation;
 	DirectX::XMFLOAT3 angVelocity;
 	bool allowAngularImpulse;
