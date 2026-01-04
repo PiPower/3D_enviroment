@@ -49,7 +49,7 @@ static void SupportFn(
 	XMMATRIX rotMat = XMMatrixTranspose(XMMatrixRotationQuaternion(rotationQuat));
 	XMVECTOR vert = XMVector3Transform(XMLoadFloat3(&box->vertecies[0]), rotMat) + posVec;
 	XMStoreFloat3(supportVec, vert);
-
+	
 	float maxProd;
 	XMStoreFloat(&maxProd, XMVector3Dot(vert, dirVec));
 	for (uint8_t i = 1; i < 8; i++)

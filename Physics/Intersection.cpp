@@ -845,6 +845,18 @@ static bool GjkIntersectionTest(
 		}
 		simplex.idxCount = last + 1;
 
+		// bubble up lambdas == 0
+		for (int i = 0; i < 4; i++)
+		{
+			if (lambdas[i] == 0.0f)
+			{
+				for (int j = i + 1; j < 4; j++)
+				{
+					std::swap(lambdas[j - 1], lambdas[j]);
+				}
+			}
+
+		}
 
 		closestDistSq = newDistSq;
 		hasOrigin = simplex.idxCount == 4;
@@ -1006,7 +1018,7 @@ static void GjkClosestDistance(
 			break;
 		}
 
-		// sort by lamdas
+		// sort by lambdas
 		int8_t last = simplex.idxCount - 1;
 		for (int8_t i = simplex.idxCount - 1; i >= 0; i--)
 		{
@@ -1019,11 +1031,25 @@ static void GjkClosestDistance(
 				last--;
 			}
 		}
+		// bubble up lambdas == 0
+		for (int i = 0; i < 4; i++)
+		{
+			if (lambdas[i] == 0.0f)
+			{
+				for (int j = i + 1; j < 4; j++)
+				{
+					std::swap(lambdas[j - 1], lambdas[j]);
+				}
+			}
+			
+		}
+
 		simplex.idxCount = last + 1;
 
 
 		closestDistSq = newDistSq;
 		iterCount++;
+
 	}
 
 	XMVECTOR v_ptOnA = XMVectorZero();

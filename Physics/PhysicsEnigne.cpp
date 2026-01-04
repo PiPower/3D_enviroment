@@ -193,10 +193,10 @@ void PhysicsEnigne::ResolveContact(
 
 	XMVECTOR ImpulseFriction = denominatorFriction * frictionCoeff * v_velTang;
 	XMStoreFloat3(&ImpulseStorage, -1.0f * ImpulseFriction);
-	bodyA->ApplyImpulse(&contact->ptOnA, &ImpulseStorage);
+	//bodyA->ApplyImpulse(&contact->ptOnA, &ImpulseStorage);
 
 	XMStoreFloat3(&ImpulseStorage, ImpulseFriction);
-	bodyB->ApplyImpulse(&contact->ptOnB, &ImpulseStorage);
+	//bodyB->ApplyImpulse(&contact->ptOnB, &ImpulseStorage);
 
 	// projecting bodies outside of eachother
 	if (contact->timeOfImpact == 0.0f)

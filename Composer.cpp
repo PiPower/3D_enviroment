@@ -19,7 +19,7 @@ Composer::Composer(
     renderer(renderer), physicsEngine(physicsEngine), calculatePhysics(true), frameMode(true),
     lights(lights), characterVelocity({ 0, 0, 0 }), constForce(gravityForce), dragCoeff(1.0f),
     orientationDir({ 0, 0, 1 }), forwardDir({ 0, 0, 1 }), upDir({ 0,1,0 }), rightDir({ 1,0,0 }),
-    characterVelocityCoeff({ 400000, 400000, 400000 }), freeFall(true)
+    characterVelocityCoeff({ 400, 400, 400 }), freeFall(true)
 {
 
     vector<GeometryEntry> boxGeo({ GeometryType::Box });
@@ -72,7 +72,7 @@ void Composer::GenerateObjects()
         bodyProps.massInv = 1.0f/40.f;
         bodyProps.rotation = { 0, 0, 0, 1 };
         bodyProps.elasticity = 0.0f;
-        bodyProps.friction = 1.0f;
+        bodyProps.friction = 0.0f;
         XMFLOAT3 scales = { 0.5f, 0.5f, 0.5f};
         XMFLOAT4 color = { 1.0f,  1.0f,  1.0f, 1.0f };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
@@ -104,7 +104,7 @@ void Composer::GenerateObjects()
         bodyProps.massInv = 0;
         bodyProps.rotation = { 0, 0, 0, 1 };
         bodyProps.elasticity = 1.0f;
-        bodyProps.friction = 1.0f;
+        bodyProps.friction = 0.01f;
         XMFLOAT3 scales = { 35, 1, 35 };
         XMFLOAT4 color = { 0.2f, 0.5f, 0.1f, 1.0f };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
@@ -120,7 +120,7 @@ void Composer::GenerateObjects()
         bodyProps.massInv = 0;
         bodyProps.rotation = { 0, 0, 0, 1 };
         bodyProps.elasticity = 1.0f;
-        bodyProps.friction = 1.0f;
+        bodyProps.friction = 0.01f;
         XMFLOAT3 scales = { 1, 20, 35 };
         XMFLOAT4 color = { 0.5f, 0.1f, 0.1f, 1.0f };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
@@ -136,7 +136,7 @@ void Composer::GenerateObjects()
         bodyProps.massInv = 0;
         bodyProps.rotation = { 0, 0, 0, 1 };
         bodyProps.elasticity = 1.0f;
-        bodyProps.friction = 1.0f;
+        bodyProps.friction = 0.01f;
         XMFLOAT3 scales = { 1, 20, 35 };
         XMFLOAT4 color = { 0.5f, 0.1f, 0.1f, 1.0f };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
@@ -152,7 +152,7 @@ void Composer::GenerateObjects()
         bodyProps.massInv = 0;
         bodyProps.rotation = { 0, 0, 0, 1 };
         bodyProps.elasticity = 1.0f;
-        bodyProps.friction = 1.0f;
+        bodyProps.friction = 0.01f;
         XMFLOAT3 scales = { 35, 20, 1 };
         XMFLOAT4 color = { 0.5f, 0.1f, 0.1f, 1.0f };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
@@ -168,7 +168,7 @@ void Composer::GenerateObjects()
         bodyProps.massInv = 0;
         bodyProps.rotation = { 0, 0, 0, 1 };
         bodyProps.elasticity = 1.0f;
-        bodyProps.friction = 1.0f;
+        bodyProps.friction = 0.01f;
         XMFLOAT3 scales = { 35, 20, 1 };
         XMFLOAT4 color = { 0.5f, 0.1f, 0.1f, 1.0f };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
@@ -186,7 +186,7 @@ void Composer::GenerateObjects()
         float angle = -3.14f / 6.0f;
         bodyProps.rotation = { 0, 0, 1.0f * sinf(angle/2.0f), cosf(angle/ 2.0f)};
         bodyProps.elasticity = 0.0f;
-        bodyProps.friction = 1.0f;
+        bodyProps.friction = 0.01f;
         XMFLOAT3 scales = { 5, 1, 1 };
         XMFLOAT4 color = { 0.5f, 0.1f, 0.1f, 1.0f };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
@@ -202,13 +202,13 @@ void Composer::UpdateObjects(
     if (calculatePhysics)
     {
 
-        bool moved = false;
 
         XMFLOAT3 velocity;
         XMStoreFloat3(&velocity,
-            characterVelocity.z * XMLoadFloat3(&forwardDir) + characterVelocity.x * XMLoadFloat3(&rightDir));
-        moved = characterVelocity.x != 0 || characterVelocity.z != 0 || characterVelocity.y != 0;
-         physicsEngine->AddForce(characterId, X_COMPONENT | Y_COMPONENT | Z_COMPONENT, constForce);
+            characterVelocity.z * XMLoadFloat3(&forwardDir) + characterVelocity.x * XMLoadFloat3(&rightDir) * 100.0f);
+
+  
+        physicsEngine->AddForce(characterId, X_COMPONENT | Y_COMPONENT | Z_COMPONENT, constForce);
         physicsEngine->AddForce(characterId, X_COMPONENT | Y_COMPONENT | Z_COMPONENT, velocity);
         
         physicsEngine->UpdateBodies(dt);
@@ -269,9 +269,11 @@ end_of_loop:
 
     if (!freeFall && i == physicsEngine->contactPoints.size() - 1)
     {
+        
         float dist;
         physicsEngine->GetDistanceBetweenBodies(characterId, lastSurface, &dist);
-        if (dist > 5)
+
+        if (dist > 0.1)
         {
             constForce = gravityForce;
             dragCoeff = 1.0f;
