@@ -39,7 +39,8 @@ struct Composer
 		const DirectX::XMFLOAT3& scales, 
 		const DirectX::XMFLOAT4& color,
 		const LinearVelocityBounds& vBounds,
-		bool allowAngularImpulse);
+		bool allowAngularImpulse,
+		const DirectX::XMFLOAT3& constForce = { 0, -15, 0 });
 public:
 	Renderer* renderer;
 	PhysicsEnigne* physicsEngine;
@@ -56,10 +57,12 @@ public:
 	DirectX::XMFLOAT3 forwardDir;
 	DirectX::XMFLOAT3 rightDir;
 	DirectX::XMFLOAT3 upDir;
-	DirectX::XMFLOAT4X4 surfaceRotation;
+	DirectX::XMFLOAT3 constForce;
 	std::vector<uint64_t> walkableSurface;
 	bool onTheSurface;
 	float timeNotOnTheSurface;
+	float dragCoeff;
+	bool freeFall;
 	// ----- Entity related -----
 	std::vector<uint64_t> physicsEntities;
 	std::vector<ObjectUbo> physicsEntitiesTrsfm;

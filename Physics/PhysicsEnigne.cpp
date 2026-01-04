@@ -133,7 +133,7 @@ void PhysicsEnigne::ResolveContact(
 {
 	Body* bodyA = contact->bodyA;
 	Body* bodyB= contact->bodyB;
-
+	XMVECTOR v_normal = XMLoadFloat3(&contact->normal);
 	float elastictyFactor =  bodyA->elasticity * bodyB->elasticity;
 
 	XMFLOAT3 angularImpulseA;
@@ -142,7 +142,7 @@ void PhysicsEnigne::ResolveContact(
 	GetAngularImpulse(bodyA, &contact->ptOnA, &contact->normal, &angularImpulseA);
 	GetAngularImpulse(bodyB, &contact->ptOnB, &contact->normal, &angularImpulseB);
 	XMVECTOR totalAngularImpulse = XMLoadFloat3(&angularImpulseA) + XMLoadFloat3(&angularImpulseB);
-	XMStoreFloat(&angularFactor, XMVector3Dot(totalAngularImpulse, XMLoadFloat3(&contact->normal)));
+	XMStoreFloat(&angularFactor, XMVector3Dot(totalAngularImpulse, v_normal));
 	float denominator = 1.0f / (bodyA->massInv + bodyB->massInv + angularFactor);
 
 	XMFLOAT3 CoM;
@@ -150,8 +150,8 @@ void PhysicsEnigne::ResolveContact(
 	XMVECTOR v_velA = XMLoadFloat3(&bodyA->linVelocity) + XMVector3Cross(XMLoadFloat3(&contact->ptOnA) - XMLoadFloat3(&CoM), XMLoadFloat3(&bodyA->angVelocity));
 	bodyB->GetCenterOfMassWorldSpace(&CoM);
 	XMVECTOR v_velB = XMLoadFloat3(&bodyB->linVelocity) + XMVector3Cross(XMLoadFloat3(&contact->ptOnB) - XMLoadFloat3(&CoM), XMLoadFloat3(&bodyB->angVelocity));
-	XMVECTOR closingSpeed = denominator * (1 + elastictyFactor) * XMVector3Dot(v_velA - v_velB, XMLoadFloat3(&contact->normal));
-	XMVECTOR reboundImpulse = XMLoadFloat3(&contact->normal) * closingSpeed;
+	XMVECTOR closingSpeed = denominator * (1 + elastictyFactor) * XMVector3Dot(v_velA - v_velB, v_normal);
+	XMVECTOR reboundImpulse = v_normal * closingSpeed;
 
 	//XMVECTOR I_A = denominator * (XMLoadFloat3(&bodyB->linVelocity) - XMLoadFloat3(&bodyA->linVelocity));
 	//XMVECTOR I_B = -I_A;
@@ -166,6 +166,29 @@ void PhysicsEnigne::ResolveContact(
 	XMStoreFloat3(&ImpulseStorage, reboundImpulse);
 	bodyB->ApplyImpulse(&contact->ptOnB, &ImpulseStorage);
 
+
+	float frictionCoeff = bodyA->friction * bodyB->friction;
+	XMVECTOR v_velProjection = v_normal * XMVector3Dot(v_velA - v_velB, v_normal);
+	XMVECTOR v_velTang = v_velA - v_velB - v_velProjection;
+
+	XMFLOAT3 angularImpulseFrictionA;
+	XMFLOAT3 angularImpulseFrictionB;
+	XMFLOAT3 v_velTangNorm;
+	XMStoreFloat3(&v_velTangNorm, XMVector3Normalize(v_velTang));
+
+	GetAngularImpulse(bodyA, &contact->ptOnA, &v_velTangNorm, &angularImpulseFrictionA);
+	GetAngularImpulse(bodyB, &contact->ptOnB, &v_velTangNorm, &angularImpulseFrictionB);
+	float angularFrictionFactor;
+	XMStoreFloat(&angularFrictionFactor,
+		XMVector3Dot(XMLoadFloat3(&angularImpulseFrictionA) + XMLoadFloat3(&angularImpulseFrictionB), XMLoadFloat3(&v_velTangNorm)));
+	float denominatorFriction = 1.0f / (bodyA->massInv + bodyB->massInv + angularFrictionFactor);
+
+	XMVECTOR ImpulseFriction = denominatorFriction * frictionCoeff * v_velTang;
+	XMStoreFloat3(&ImpulseStorage, -1.0f * ImpulseFriction);
+	bodyA->ApplyImpulse(&contact->ptOnA, &ImpulseStorage);
+
+	XMStoreFloat3(&ImpulseStorage, ImpulseFriction);
+	bodyB->ApplyImpulse(&contact->ptOnB, &ImpulseStorage);
 
 	// projecting bodies outside of eachother
 	if (contact->timeOfImpact == 0.0f)
@@ -314,7 +337,7 @@ int64_t PhysicsEnigne::AddBody(
 	uint64_t* bodyId,
 	bool allowAngularImpulse,
 	const LinearVelocityBounds& vBounds,
-	DirectX::XMFLOAT3 constForce)
+	const DirectX::XMFLOAT3& constForce)
 {
 	Body body;
 	body.angVelocity = props.angVelocity;
@@ -325,6 +348,7 @@ int64_t PhysicsEnigne::AddBody(
 	body.elasticity = props.elasticity;
 	body.allowAngularImpulse = allowAngularImpulse;
 	body.vBounds = vBounds;
+	body.friction = props.friction;
 	body.shape = CreateDefaultShape(shapeType, scales);
 
 	if (isDynamic)
