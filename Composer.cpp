@@ -327,7 +327,7 @@ end_of_loop:
             //upDir = upInitial;
             //forwardDir = orientationDir;
             //XMStoreFloat3(&rightDir, XMVector3Normalize(XMVector3Cross(XMLoadFloat3(&orientationDir), XMLoadFloat3(&upInitial))));
-            dragCoeff = { 0.97f, 1.0f,  0.97f };
+            dragCoeff = { 0.9f, 1.0f,  0.9f };
             //freeFall = true;
         }
     }
