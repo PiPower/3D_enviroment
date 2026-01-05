@@ -13,7 +13,10 @@ struct  CameraOrientation
 		eye(eye), up(up), lookDir(lookDir) {}
 };
 
+struct WalkableSurface
+{
 
+};
 struct Composer
 {
 	Composer(

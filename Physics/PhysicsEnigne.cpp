@@ -108,6 +108,16 @@ void PhysicsEnigne::GetDistanceBetweenBodies(
 	DistanceBetweenBodies(GetBody(idBodyA), GetBody(idBodyB), nullptr, nullptr, dist);
 }
 
+void PhysicsEnigne::GetDistanceBetweenBodies(
+	uint64_t idBodyA,
+	uint64_t idBodyB,
+	DirectX::XMFLOAT3* ptOnA,
+	DirectX::XMFLOAT3* ptOnB,
+	float* dist)
+{
+	DistanceBetweenBodies(GetBody(idBodyA), GetBody(idBodyB), ptOnA, ptOnB, dist);
+}
+
 Body* PhysicsEnigne::GetBody(
 	uint64_t bodyId)
 {

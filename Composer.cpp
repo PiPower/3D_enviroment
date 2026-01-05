@@ -19,7 +19,7 @@ Composer::Composer(
     renderer(renderer), physicsEngine(physicsEngine), calculatePhysics(true), frameMode(true),
     lights(lights), characterVelocity({ 0, 0, 0 }), constForce(gravityForce), dragCoeff({ 0.5f, 1.0f, 0.5f }),
     orientationDir({ 0, 0, 1 }), forwardDir({ 0, 0, 1 }), upDir({ 0,1,0 }), rightDir({ 1,0,0 }),
-    characterVelocityCoeff({ 25000, 25000, 25000 }), freeFall(true)
+    characterVelocityCoeff({ 50000, 50000, 50000 }), freeFall(true)
 {
 
     vector<GeometryEntry> boxGeo({ GeometryType::Box });
@@ -194,6 +194,23 @@ void Composer::GenerateObjects()
         walkableSurface.push_back(physicsEntities.back());
     }
 
+    // balcony
+    {
+        BodyProperties bodyProps;
+        bodyProps.position = { 8.85, 2.374, 0 };
+        bodyProps.linVelocity = { 0, 0, 0 };
+        bodyProps.angVelocity = { 0, 0, 0 };
+        bodyProps.massInv = 0;
+        bodyProps.rotation = { 0, 0, 0, 1 };
+        bodyProps.elasticity = 1.0f;
+        bodyProps.friction = 0.01f;
+        XMFLOAT3 scales = { 5, 1, 5 };
+        XMFLOAT4 color = { 0.6f, 0.6f, 0.1f, 1.0f };
+        LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, bounds, true);
+        walkableSurface.push_back(physicsEntities.back());
+    }
+
 }
 
 void Composer::UpdateObjects(
@@ -207,7 +224,9 @@ void Composer::UpdateObjects(
         XMStoreFloat3(&velocity,
             characterVelocity.z * XMLoadFloat3(&forwardDir) + characterVelocity.x * XMLoadFloat3(&rightDir));
 
-  
+        string speeds = "x: " + to_string(rightDir.x) + "y: " + to_string(rightDir.y) + "z: " + to_string(rightDir.z) + "\n";
+        OutputDebugStringA(speeds.c_str());
+
         physicsEngine->AddForce(characterId, X_COMPONENT | Y_COMPONENT | Z_COMPONENT, constForce);
         physicsEngine->AddForce(characterId, X_COMPONENT | Y_COMPONENT | Z_COMPONENT, velocity);
         
@@ -250,6 +269,12 @@ void Composer::UpdateObjects(
             {
                 Contact *contact = &physicsEngine->contactPoints[i];
 
+                if (contact->normal.x >= 0.96)
+                {
+                    continue;
+                   int x = 2;
+                }
+
                 upDir = contact->normal;
                 XMVECTOR v_upDir = XMLoadFloat3(&upDir);
                 XMVECTOR v_orientation = XMLoadFloat3(&orientationDir);
@@ -271,18 +296,23 @@ end_of_loop:
     {
         
         float dist;
-        physicsEngine->GetDistanceBetweenBodies(characterId, lastSurface, &dist);
-
+        XMFLOAT3 ptOnCharacter, ptOnSurface;
+        physicsEngine->GetDistanceBetweenBodies(characterId, lastSurface, &ptOnCharacter, &ptOnSurface, &dist);
         if (dist > 0.01)
         {
-            constForce = gravityForce;
-            dragCoeff = { 0.7f, 1.0f, 0.7f };
-            
-            upDir = { 0, 1.0f, 0.0f };
-            forwardDir = orientationDir;
-            XMVECTOR v_upDir = XMLoadFloat3(&upDir);
-            XMVECTOR v_orientation = XMLoadFloat3(&orientationDir);
-            XMStoreFloat3(&rightDir, XMVector3Normalize(XMVector3Cross(v_orientation, v_upDir)));
+            constForce = { 0, -30, 0 };
+            //Body* characterBody = physicsEngine->GetBody(characterId);
+            //XMVECTOR diff = XMLoadFloat3(&ptOnSurface) - XMLoadFloat3(&ptOnCharacter);
+            //XMStoreFloat3(&characterBody->position,
+            //    XMLoadFloat3(&characterBody->position) + 0.1 * diff);
+            //constForce = gravityForce;
+            //dragCoeff = { 0.7f, 1.0f, 0.7f };
+            // add smooth transition betwen move vectors
+            //upDir = { 0, 1.0f, 0.0f };
+            //forwardDir = orientationDir;
+            //XMVECTOR v_upDir = XMLoadFloat3(&upDir);
+            //XMVECTOR v_orientation = XMLoadFloat3(&orientationDir);
+            //XMStoreFloat3(&rightDir, XMVector3Normalize(XMVector3Cross(v_orientation, v_upDir)));
    
         }
     }

@@ -81,6 +81,13 @@ struct PhysicsEnigne
 		Contact* contact
 	);
 
+	void GetDistanceBetweenBodies(
+		uint64_t idBodyA,
+		uint64_t idBodyB,
+		DirectX::XMFLOAT3* ptOnA,
+		DirectX::XMFLOAT3* ptOnB,
+		float* dist);
+
 	void SortBodiesByDistanceToPlane(
 		 const DirectX::XMFLOAT3* normal,
 		float dt);
