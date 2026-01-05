@@ -62,6 +62,10 @@ struct Body
 	void GetInverseInertiaTensorWorldSpace(
 		DirectX::XMFLOAT4X4* tensor) const;
 
+	void GetFaceNormalFromPoint(
+		const DirectX::XMFLOAT3* point, 
+		DirectX::XMFLOAT3* normal);
+
 	BoundingBox getBoundingBox() const;
 };
 

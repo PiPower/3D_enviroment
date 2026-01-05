@@ -17,7 +17,7 @@ Composer::Composer(
     :
     cameraAngleX(0), cameraAngleY(0), camOrientation(eyeInitial, upInitial, lookDirInitial),
     renderer(renderer), physicsEngine(physicsEngine), calculatePhysics(true), frameMode(true),
-    lights(lights), characterVelocity({ 0, 0, 0 }), constForce(gravityForce), dragCoeff({ 0.5f, 1.0f, 0.5f }),
+    lights(lights), characterVelocity({ 0, 0, 0 }), constForce(gravityForce), dragCoeff({ 0.98f, 1.0f,  0.98f }),
     orientationDir({ 0, 0, 1 }), forwardDir({ 0, 0, 1 }), upDir({ 0,1,0 }), rightDir({ 1,0,0 }),
     characterVelocityCoeff({ 50000, 50000, 50000 }), freeFall(true)
 {
@@ -47,6 +47,31 @@ void Composer::RenderScene()
     renderer->BeginRendering();
     renderer->Render(boxCollection, graphicsPipelineType, renderEntities);
     renderer->Present();
+}
+
+void Composer::AddWalkableCuboid(
+    uint64_t bodyId, 
+    uint8_t faceId)
+{
+    walkableCuboids.push_back({ bodyId, faceId });
+}
+
+bool Composer::CheckIfObjIsOnWalkableCuboidSurface(
+    const DirectX::XMFLOAT3& ptOnCuboid,
+    size_t cuboidIdx)
+{
+    XMFLOAT3 faceNormal;
+    WalkableCuboid& cuboidDex = walkableCuboids[cuboidIdx];
+    Body* cuboid = physicsEngine->GetBody(cuboidDex.bodyId);
+    cuboid->GetFaceNormalFromPoint(&ptOnCuboid, &faceNormal);
+
+    if (faceNormal.x == 1.0f && (cuboidDex.faceIds & w_right) > 0) { return true; };
+    if (faceNormal.x == -1.0f && (cuboidDex.faceIds & w_left) > 0) { return true; };
+    if (faceNormal.y == 1.0f && (cuboidDex.faceIds & w_top) > 0) { return true; };
+    if (faceNormal.y == -1.0f && (cuboidDex.faceIds & w_bottom) > 0) { return true; };
+    if (faceNormal.z == 1.0f && (cuboidDex.faceIds & w_back) > 0) { return true; };
+    if (faceNormal.z == -1.0f && (cuboidDex.faceIds & w_front) > 0) { return true; };
+    return false;
 }
 
 void Composer::UpdateCamera()
@@ -109,7 +134,7 @@ void Composer::GenerateObjects()
         XMFLOAT4 color = { 0.2f, 0.5f, 0.1f, 1.0f };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
         AddBody(ShapeType::OrientedBox, bodyProps, scales, color, bounds, true);
-        walkableSurface.push_back(physicsEntities.back());
+        AddWalkableCuboid(physicsEntities.back(), w_top);
     }
     // left wall
     {
@@ -191,7 +216,7 @@ void Composer::GenerateObjects()
         XMFLOAT4 color = { 0.5f, 0.1f, 0.1f, 1.0f };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
         AddBody(ShapeType::OrientedBox, bodyProps, scales, color, bounds, true);
-        walkableSurface.push_back(physicsEntities.back());
+        AddWalkableCuboid(physicsEntities.back(), w_top);
     }
 
     // balcony
@@ -208,7 +233,7 @@ void Composer::GenerateObjects()
         XMFLOAT4 color = { 0.6f, 0.6f, 0.1f, 1.0f };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
         AddBody(ShapeType::OrientedBox, bodyProps, scales, color, bounds, true);
-        walkableSurface.push_back(physicsEntities.back());
+        AddWalkableCuboid(physicsEntities.back(), w_top);
     }
 
 }
@@ -218,8 +243,6 @@ void Composer::UpdateObjects(
 {
     if (calculatePhysics)
     {
-
-
         XMFLOAT3 velocity;
         XMStoreFloat3(&velocity,
             characterVelocity.z * XMLoadFloat3(&forwardDir) + characterVelocity.x * XMLoadFloat3(&rightDir));
@@ -253,21 +276,29 @@ void Composer::UpdateObjects(
     size_t i;
     for (i = 0; i < physicsEngine->contactPoints.size() -1 ; i++)
     {
-        for (size_t j = 0; j < walkableSurface.size(); j++)
+        for (size_t j = 0; j < walkableCuboids.size(); j++)
         {
-            Body* surface = physicsEngine->GetBody(walkableSurface[j]);
-            if (physicsEngine->contactPoints[i].bodyA == surface ||
-                physicsEngine->contactPoints[i].bodyB == surface)
+            Body* cuboid = physicsEngine->GetBody(walkableCuboids[j].bodyId);
+            if (physicsEngine->contactPoints[i].bodyA == cuboid ||
+                physicsEngine->contactPoints[i].bodyB == cuboid)
             {
                 Contact *contact = &physicsEngine->contactPoints[i];
+                XMFLOAT3* ptOnCuboid = physicsEngine->contactPoints[i].bodyA == cuboid ?
+                                        &contact->ptOnA : &contact->ptOnB;
+
+                if (!CheckIfObjIsOnWalkableCuboidSurface(*ptOnCuboid, j))
+                {
+                    continue;
+                }
+
 
                 upDir = contact->normal;
                 XMVECTOR v_upDir = XMLoadFloat3(&upDir);
                 XMVECTOR v_orientation = XMLoadFloat3(&orientationDir);
                 XMVECTOR v_forwardDir = XMVector3Normalize(v_orientation - XMVector3Dot(v_orientation, v_upDir));
                 XMStoreFloat3(&forwardDir, v_forwardDir);
-                XMStoreFloat3(&rightDir, XMVector3Normalize(XMVector3Cross(v_upDir, v_forwardDir) ) );
-                lastSurface = walkableSurface[j];
+                XMStoreFloat3(&rightDir, XMVector3Normalize(XMVector3Cross(v_forwardDir, v_upDir) ) );
+                lastSurface = walkableCuboids[j].bodyId;
                 constForce = { 0, 0, 0}; // character is on inclined object so disable gravity
                 dragCoeff = { 0.99, 0.99, 0.99 };
                 freeFall = false;
@@ -287,6 +318,17 @@ end_of_loop:
         if (dist > 0.01)
         {
             constForce = { 0, -30, 0 };
+        }
+        
+        if (dist > 0.2)
+        {
+            constForce = { 0, -30, 0 };
+
+            //upDir = upInitial;
+            //forwardDir = orientationDir;
+            //XMStoreFloat3(&rightDir, XMVector3Normalize(XMVector3Cross(XMLoadFloat3(&orientationDir), XMLoadFloat3(&upInitial))));
+            dragCoeff = { 0.97f, 1.0f,  0.97f };
+            //freeFall = true;
         }
     }
 
@@ -338,11 +380,11 @@ void Composer::ProcessUserInput(
     }
     if (window->IsKeyPressed(VK_LEFT))
     {
-        characterVelocity.x += characterVelocityCoeff.x * dt;
+        characterVelocity.x -= characterVelocityCoeff.x * dt;
     }
     if (window->IsKeyPressed(VK_RIGHT))
     {
-        characterVelocity.x -= characterVelocityCoeff.x * dt;
+        characterVelocity.x += characterVelocityCoeff.x * dt;
     }
     
 

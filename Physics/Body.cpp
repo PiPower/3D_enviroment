@@ -136,6 +136,15 @@ void Body::GetInverseInertiaTensorWorldSpace(
 	shape.getInverseInertiaTensorWorldSpace(&shape, massInv, &rotation, tensor);
 }
 
+void Body::GetFaceNormalFromPoint(
+	const DirectX::XMFLOAT3* point,
+	DirectX::XMFLOAT3* normal)
+{
+	XMFLOAT3 localSpacePoint;
+	GetPointInLocalSpace(point, &localSpacePoint);
+	shape.getFaceNormalFromPoint(&shape, &localSpacePoint, normal);
+}
+
 BoundingBox Body::getBoundingBox() const
 {
 	return shape.getBoundingBox(&shape, &position, &rotation);

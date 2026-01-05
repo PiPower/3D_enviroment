@@ -13,10 +13,19 @@ struct  CameraOrientation
 		eye(eye), up(up), lookDir(lookDir) {}
 };
 
-struct WalkableSurface
-{
+constexpr uint8_t w_top = 0x1;
+constexpr uint8_t w_bottom = 0x1 << 1;
+constexpr uint8_t w_front = 0x1 << 2;
+constexpr uint8_t w_back = 0x1 << 3;
+constexpr uint8_t w_left = 0x1 << 4;
+constexpr uint8_t w_right = 0x1 << 5;
 
+struct WalkableCuboid
+{
+	uint64_t bodyId;
+	uint8_t faceIds;
 };
+
 struct Composer
 {
 	Composer(
@@ -25,6 +34,14 @@ struct Composer
 		const std::vector<Light>& lights);
 
 	void RenderScene();
+
+	void AddWalkableCuboid(
+		uint64_t bodyId, 
+		uint8_t faceId);
+
+	bool CheckIfObjIsOnWalkableCuboidSurface(
+		const DirectX::XMFLOAT3& ptOnCuboid,
+		size_t cuboidIdx);
 
 	void UpdateCamera();
 
@@ -62,7 +79,7 @@ public:
 	DirectX::XMFLOAT3 upDir;
 	DirectX::XMFLOAT3 constForce;
 	DirectX::XMFLOAT3 dragCoeff;
-	std::vector<uint64_t> walkableSurface;
+	std::vector<WalkableCuboid> walkableCuboids;
 	uint64_t lastSurface;
 	uint64_t characterId;
 	bool freeFall;

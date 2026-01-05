@@ -143,6 +143,35 @@ static BoundingBox GetBoundingBox_Box(
 	return bBox;
 }
 
+static void GetFaceNormalFromPoint_Box(
+	const Shape* shape,
+	const DirectX::XMFLOAT3* pointOnShape,
+	DirectX::XMFLOAT3* normal)
+{
+	Box* box = (Box*)shape->shapeData;
+	constexpr XMFLOAT3 normals[6] = { {0, 1, 0}, {0, -1, 0}, 
+									  {1, 0, 0}, {-1, 0, 0},
+									  {0, 0, 1}, {0, 0, -1} };
+
+	XMFLOAT3 pointOnPlane[6] = { {0, box->scales.y, 0}, {0, -box->scales.y, 0},
+								 {box->scales.x, 0, 0}, {-box->scales.x, 0, 0},
+								 {0, 0, box->scales.z}, {0, 0, -box->scales.z}};
+
+	float minProd = 1e10;
+	XMVECTOR v_point = XMLoadFloat3(pointOnShape);
+	for (int i = 0; i < 6; i++)
+	{
+		XMVECTOR v_vec = XMVector3Normalize(v_point - XMLoadFloat3(&pointOnPlane[i]));
+		float prod;
+		XMStoreFloat(&prod, XMVector3Dot(v_vec, XMLoadFloat3(&normals[i])));
+		if (fabsf(prod) < minProd)
+		{
+			minProd = fabsf(prod);
+			*normal = normals[i];
+		}
+	}
+}
+
 Shape GetDefaultBoxShape(
 	DirectX::XMFLOAT3 scales)
 {
@@ -154,6 +183,7 @@ Shape GetDefaultBoxShape(
 	boxShape.getCenterOfMass = GetCenterOfMassBox;
 	boxShape.getPartialInertiaTensor = GetPartialInertiaTensorBox;
 	boxShape.getBoundingBox = GetBoundingBox_Box;
+	boxShape.getFaceNormalFromPoint = GetFaceNormalFromPoint_Box;
 
 	Box* box = new Box();
 	box->scales = scales;

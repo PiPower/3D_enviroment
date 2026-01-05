@@ -42,6 +42,12 @@ typedef BoundingBox (*GetBoundingBox)(
 	const DirectX::XMFLOAT3* position,
 	const DirectX::XMFLOAT4* rotationQuat);
 
+// function DOES NOT check if pointOnShape lays on the shape
+typedef void(*GetFaceNormalFromPoint)(
+	const Shape* shape,
+	const DirectX::XMFLOAT3* pointOnShape,
+	DirectX::XMFLOAT3* normal);
+
 struct Shape
 {
 	GetTrasformationMatrix getTrasformationMatrix;
@@ -51,5 +57,6 @@ struct Shape
 	GetCenterOfMass getCenterOfMass;
 	GetPartialInertiaTensor getPartialInertiaTensor;
 	GetBoundingBox getBoundingBox;
+	GetFaceNormalFromPoint getFaceNormalFromPoint;
 	char* shapeData;
 };
