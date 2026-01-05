@@ -224,8 +224,6 @@ void Composer::UpdateObjects(
         XMStoreFloat3(&velocity,
             characterVelocity.z * XMLoadFloat3(&forwardDir) + characterVelocity.x * XMLoadFloat3(&rightDir));
 
-        string speeds = "x: " + to_string(rightDir.x) + "y: " + to_string(rightDir.y) + "z: " + to_string(rightDir.z) + "\n";
-        OutputDebugStringA(speeds.c_str());
 
         physicsEngine->AddForce(characterId, X_COMPONENT | Y_COMPONENT | Z_COMPONENT, constForce);
         physicsEngine->AddForce(characterId, X_COMPONENT | Y_COMPONENT | Z_COMPONENT, velocity);
@@ -239,12 +237,6 @@ void Composer::UpdateObjects(
         velocity.y *= dragCoeff.y;
         velocity.z *= dragCoeff.z;
         physicsEngine->SetLinearVelocity(characterId, X_COMPONENT | Y_COMPONENT | Z_COMPONENT, velocity);
-
-        //if (characterVelocity.x == 0.0f) { vel.x *= 0.1; }
-        //if (characterVelocity.y == 0.0f && vel.y > 0) { vel.y *= 0.1; }
-        //if (characterVelocity.z == 0.0f) { vel.z *= 0.1; }
-        //physicsEngine->SetLinearVelocity(physicsEntities[characterId], X_COMPONENT | Y_COMPONENT | Z_COMPONENT, vel);
-        //characterVelocity = { 0, 0, 0 };
 
         if (frameMode)
         {
@@ -268,12 +260,6 @@ void Composer::UpdateObjects(
                 physicsEngine->contactPoints[i].bodyB == surface)
             {
                 Contact *contact = &physicsEngine->contactPoints[i];
-
-                if (contact->normal.x >= 0.96)
-                {
-                    continue;
-                   int x = 2;
-                }
 
                 upDir = contact->normal;
                 XMVECTOR v_upDir = XMLoadFloat3(&upDir);
@@ -301,19 +287,6 @@ end_of_loop:
         if (dist > 0.01)
         {
             constForce = { 0, -30, 0 };
-            //Body* characterBody = physicsEngine->GetBody(characterId);
-            //XMVECTOR diff = XMLoadFloat3(&ptOnSurface) - XMLoadFloat3(&ptOnCharacter);
-            //XMStoreFloat3(&characterBody->position,
-            //    XMLoadFloat3(&characterBody->position) + 0.1 * diff);
-            //constForce = gravityForce;
-            //dragCoeff = { 0.7f, 1.0f, 0.7f };
-            // add smooth transition betwen move vectors
-            //upDir = { 0, 1.0f, 0.0f };
-            //forwardDir = orientationDir;
-            //XMVECTOR v_upDir = XMLoadFloat3(&upDir);
-            //XMVECTOR v_orientation = XMLoadFloat3(&orientationDir);
-            //XMStoreFloat3(&rightDir, XMVector3Normalize(XMVector3Cross(v_orientation, v_upDir)));
-   
         }
     }
 
