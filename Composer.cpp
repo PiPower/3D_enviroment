@@ -108,7 +108,7 @@ void Composer::GenerateObjects()
     // collider
     {
         BodyProperties bodyProps;
-        bodyProps.position = { 10, 7, 0 };
+        bodyProps.position = { 10, 2, 0 };
         bodyProps.linVelocity = { 0, 0, 0 };
         bodyProps.angVelocity = { 0, 0, 0 };
         bodyProps.massInv = 1.0f / 20.f;
@@ -117,7 +117,8 @@ void Composer::GenerateObjects()
         bodyProps.friction = 1.0f;
         XMFLOAT3 scales = { 1.0f, 1.0f, 1.0f };
         XMFLOAT4 color = { 1.0f,  1.0f,  1.0f, 1.0f };
-        //AddBody(ShapeType::OrientedBox, bodyProps, scales, color, true);
+        LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, bounds, true);
     }
 
     // floor
@@ -278,9 +279,16 @@ void Composer::UpdateObjects(
     {
         for (size_t j = 0; j < walkableCuboids.size(); j++)
         {
+            Body* character = physicsEngine->GetBody(characterId);
+            if (physicsEngine->contactPoints[i].bodyA != character &&
+                physicsEngine->contactPoints[i].bodyB != character)
+            {
+                continue;
+            }
+
             Body* cuboid = physicsEngine->GetBody(walkableCuboids[j].bodyId);
             if (physicsEngine->contactPoints[i].bodyA == cuboid ||
-                physicsEngine->contactPoints[i].bodyB == cuboid)
+                physicsEngine->contactPoints[i].bodyB == cuboid )
             {
                 Contact *contact = &physicsEngine->contactPoints[i];
                 XMFLOAT3* ptOnCuboid = physicsEngine->contactPoints[i].bodyA == cuboid ?
@@ -300,7 +308,7 @@ void Composer::UpdateObjects(
                 XMStoreFloat3(&rightDir, XMVector3Normalize(XMVector3Cross(v_forwardDir, v_upDir) ) );
                 lastSurface = walkableCuboids[j].bodyId;
                 constForce = { 0, 0, 0}; // character is on inclined object so disable gravity
-                dragCoeff = { 0.99, 0.99, 0.99 };
+                dragCoeff = { 0.85, 0.85, 0.85 };
                 freeFall = false;
                 goto end_of_loop;
             }
@@ -315,12 +323,12 @@ end_of_loop:
         float dist;
         XMFLOAT3 ptOnCharacter, ptOnSurface;
         physicsEngine->GetDistanceBetweenBodies(characterId, lastSurface, &ptOnCharacter, &ptOnSurface, &dist);
-        if (dist > 0.01)
+        if (dist > 0.01f && dist <= 0.2f)
         {
             constForce = { 0, -30, 0 };
         }
         
-        if (dist > 0.2)
+        if (dist > 0.2f)
         {
             constForce = { 0, -30, 0 };
 
