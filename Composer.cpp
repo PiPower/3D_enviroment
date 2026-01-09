@@ -18,7 +18,7 @@ Composer::Composer(
     cameraAngleX(0), cameraAngleY(0), camOrientation(eyeInitial, upInitial, lookDirInitial),
     renderer(renderer), physicsEngine(physicsEngine), calculatePhysics(true), frameMode(true),
     lights(lights), characterVelocity({ 0, 0, 0 }), constForce(gravityForce), dragCoeff({ 0.98f, 1.0f,  0.98f }),
-    orientationDir({ 0, 0, 1 }), forwardDir({ 0, 0, 1 }), upDir({ 0,1,0 }), rightDir({ 1,0,0 }),
+    orientationDir({ 1, 0, 0 }), forwardDir({ 1, 0, 0 }), upDir({ 0,1,0 }), rightDir({ 0,0,-1 }),
     characterVelocityCoeff({ 50000, 50000, 50000 }), freeFall(true)
 {
 
@@ -301,14 +301,15 @@ void Composer::UpdateObjects(
 
 
                 upDir = contact->normal;
-                XMVECTOR v_upDir = XMLoadFloat3(&upDir);
+                XMVECTOR v_upDir = -XMLoadFloat3(&upDir);
                 XMVECTOR v_orientation = XMLoadFloat3(&orientationDir);
-                XMVECTOR v_forwardDir = XMVector3Normalize(v_orientation - XMVector3Dot(v_orientation, v_upDir));
+                XMVECTOR v_projection = -v_upDir * XMVector3Dot(v_orientation, -v_upDir);
+                XMVECTOR v_forwardDir = XMVector3Normalize(v_orientation - v_projection);
                 XMStoreFloat3(&forwardDir, v_forwardDir);
-                XMStoreFloat3(&rightDir, XMVector3Normalize(XMVector3Cross(v_forwardDir, v_upDir) ) );
+                XMStoreFloat3(&rightDir, XMVector3Normalize(XMVector3Cross(v_forwardDir, -v_upDir) ) );
                 lastSurface = walkableCuboids[j].bodyId;
                 constForce = { 0, 0, 0}; // character is on inclined object so disable gravity
-                dragCoeff = { 0.85, 0.85, 0.85 };
+                dragCoeff = { 0.99, 0.99, 0.99 };
                 freeFall = false;
                 goto end_of_loop;
             }
