@@ -1073,7 +1073,7 @@ void DistanceBetweenBodies(
 	float* dist)
 {
 	XMFLOAT3 a, b;
-	GjkClosestDistance(bodyA, bodyB, &a, &b, 0.001);
+	GjkClosestDistance(bodyA, bodyB, &a, &b, 0);
 
 	if (ptOnA)
 	{

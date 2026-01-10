@@ -136,13 +136,24 @@ void Body::GetInverseInertiaTensorWorldSpace(
 	shape.getInverseInertiaTensorWorldSpace(&shape, massInv, &rotation, tensor);
 }
 
-void Body::GetFaceNormalFromPoint(
+void Body::GetLocalSpaceFaceNormalFromPoint(
 	const DirectX::XMFLOAT3* point,
 	DirectX::XMFLOAT3* normal)
 {
 	XMFLOAT3 localSpacePoint;
 	GetPointInLocalSpace(point, &localSpacePoint);
 	shape.getFaceNormalFromPoint(&shape, &localSpacePoint, normal);
+}
+
+void Body::GetWorldSpaceFaceNormalFromPoint(
+	const DirectX::XMFLOAT3* point,
+	DirectX::XMFLOAT3* normal)
+{
+	GetLocalSpaceFaceNormalFromPoint(point, normal);
+
+	XMMATRIX v_Rotation = XMMatrixTranspose(XMMatrixRotationQuaternion((XMLoadFloat4(&rotation))));
+	XMVECTOR v_localPoint = XMVector3Transform(XMLoadFloat3(normal), v_Rotation);
+	XMStoreFloat3(normal, XMVector3Normalize(v_localPoint));
 }
 
 BoundingBox Body::getBoundingBox() const

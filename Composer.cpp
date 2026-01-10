@@ -10,6 +10,15 @@ static constexpr XMFLOAT3 lookDirInitial = { 0.0f, 0.0f, 1.0f };
 static constexpr XMFLOAT3 upInitial = { 0.0f, 1.0f, 0.0f };
 static constexpr uint64_t graphicsPipelineType = (uint64_t)PipelineTypes::Graphics;
 
+struct PointProjection
+{
+    float dist;
+    XMFLOAT3 ptOnSurfA;
+    XMFLOAT3 ptOnSurfB;
+    size_t idBodyA;
+    size_t idBodyB;
+};
+
 Composer::Composer(
     Renderer* renderer,
     PhysicsEnigne* physicsEngine,
@@ -19,7 +28,7 @@ Composer::Composer(
     renderer(renderer), physicsEngine(physicsEngine), calculatePhysics(true), frameMode(true),
     lights(lights), characterVelocity({ 0, 0, 0 }), constForce(gravityForce), dragCoeff({ 0.98f, 1.0f,  0.98f }),
     orientationDir({ 1, 0, 0 }), forwardDir({ 1, 0, 0 }), upDir({ 0,1,0 }), rightDir({ 0,0,-1 }),
-    characterVelocityCoeff({ 50000, 50000, 50000 }), freeFall(true)
+    characterVelocityCoeff({ 70000, 70000, 70000 }), freeFall(true), scalesVel({1.0f, 1.0f, 1.0f})
 {
 
     vector<GeometryEntry> boxGeo({ GeometryType::Box });
@@ -63,7 +72,7 @@ bool Composer::CheckIfObjIsOnWalkableCuboidSurface(
     XMFLOAT3 faceNormal;
     WalkableCuboid& cuboidDex = walkableCuboids[cuboidIdx];
     Body* cuboid = physicsEngine->GetBody(cuboidDex.bodyId);
-    cuboid->GetFaceNormalFromPoint(&ptOnCuboid, &faceNormal);
+    cuboid->GetLocalSpaceFaceNormalFromPoint(&ptOnCuboid, &faceNormal);
 
     if (faceNormal.x == 1.0f && (cuboidDex.faceIds & w_right) > 0) { return true; };
     if (faceNormal.x == -1.0f && (cuboidDex.faceIds & w_left) > 0) { return true; };
@@ -246,15 +255,15 @@ void Composer::UpdateObjects(
     {
         XMFLOAT3 velocity;
         XMStoreFloat3(&velocity,
-            characterVelocity.z * XMLoadFloat3(&forwardDir) + characterVelocity.x * XMLoadFloat3(&rightDir));
+           XMLoadFloat3(&scalesVel) * 
+           ( characterVelocity.z * XMLoadFloat3(&forwardDir) + characterVelocity.x * XMLoadFloat3(&rightDir)));
 
 
         physicsEngine->AddForce(characterId, X_COMPONENT | Y_COMPONENT | Z_COMPONENT, constForce);
         physicsEngine->AddForce(characterId, X_COMPONENT | Y_COMPONENT | Z_COMPONENT, velocity);
-        
         physicsEngine->UpdateBodies(dt);
 
-        characterVelocity = { 0, 0, 0 };
+  
 
         physicsEngine->GetLinearVelocity(characterId, &velocity);
         velocity.x *= dragCoeff.x;
@@ -274,77 +283,10 @@ void Composer::UpdateObjects(
         renderer->UpdateUboMemory(uboPool, renderEntities[i].transformUboId, (char*) &physicsEntitiesTrsfm[i].transform);
     }
 
-    size_t i;
-    for (i = 0; i < physicsEngine->contactPoints.size() -1 ; i++)
-    {
-        for (size_t j = 0; j < walkableCuboids.size(); j++)
-        {
-            Body* character = physicsEngine->GetBody(characterId);
-            if (physicsEngine->contactPoints[i].bodyA != character &&
-                physicsEngine->contactPoints[i].bodyB != character)
-            {
-                continue;
-            }
-
-            Body* cuboid = physicsEngine->GetBody(walkableCuboids[j].bodyId);
-            if (physicsEngine->contactPoints[i].bodyA == cuboid ||
-                physicsEngine->contactPoints[i].bodyB == cuboid )
-            {
-                Contact *contact = &physicsEngine->contactPoints[i];
-                XMFLOAT3* ptOnCuboid = physicsEngine->contactPoints[i].bodyA == cuboid ?
-                                        &contact->ptOnA : &contact->ptOnB;
-
-                if (!CheckIfObjIsOnWalkableCuboidSurface(*ptOnCuboid, j))
-                {
-                    continue;
-                }
-
-
-                upDir = contact->normal;
-                XMVECTOR v_upDir = -XMLoadFloat3(&upDir);
-                XMVECTOR v_orientation = XMLoadFloat3(&orientationDir);
-                XMVECTOR v_projection = -v_upDir * XMVector3Dot(v_orientation, -v_upDir);
-                XMVECTOR v_forwardDir = XMVector3Normalize(v_orientation - v_projection);
-                XMStoreFloat3(&forwardDir, v_forwardDir);
-                XMStoreFloat3(&rightDir, XMVector3Normalize(XMVector3Cross(v_forwardDir, -v_upDir) ) );
-                lastSurface = walkableCuboids[j].bodyId;
-                constForce = { 0, 0, 0}; // character is on inclined object so disable gravity
-                dragCoeff = { 0.99, 0.99, 0.99 };
-                freeFall = false;
-                goto end_of_loop;
-            }
-        }
-    }
-
-end_of_loop:
-
-    if (!freeFall && i == physicsEngine->contactPoints.size() - 1)
-    {
-        
-        float dist;
-        XMFLOAT3 ptOnCharacter, ptOnSurface;
-        physicsEngine->GetDistanceBetweenBodies(characterId, lastSurface, &ptOnCharacter, &ptOnSurface, &dist);
-        if (dist > 0.01f && dist <= 0.2f)
-        {
-            constForce = { 0, -30, 0 };
-        }
-        
-        if (dist > 0.2f)
-        {
-            constForce = { 0, -30, 0 };
-
-            //upDir = upInitial;
-            //forwardDir = orientationDir;
-            //XMStoreFloat3(&rightDir, XMVector3Normalize(XMVector3Cross(XMLoadFloat3(&orientationDir), XMLoadFloat3(&upInitial))));
-            dragCoeff = { 0.9f, 1.0f,  0.9f };
-            //freeFall = true;
-        }
-    }
-
+    UpdateMovementVectors();
+    characterVelocity = { 0, 0, 0 };
     return;
 }
-
-
 
 void Composer::ProcessUserInput(
     Window* window,
@@ -470,5 +412,69 @@ void Composer::AddBody(
     physicsEntitiesTrsfm[entitySize].color[1] = color.y;
     physicsEntitiesTrsfm[entitySize].color[2] = color.z;
     physicsEntitiesTrsfm[entitySize].color[3] = color.w;
+
+}
+
+void Composer::UpdateMovementVectors()
+{
+    PointProjection projection{ 1e10 };
+
+    size_t id = 0;
+    for (size_t j = 0; j < walkableCuboids.size(); j++)
+    {
+        float dist;
+        XMFLOAT3 ptOnCharacter, ptOnSurface;
+        physicsEngine->GetDistanceBetweenBodies(characterId, walkableCuboids[j].bodyId, &ptOnCharacter, &ptOnSurface, &dist);
+        if (dist < projection.dist)
+        {
+            projection.dist = dist;
+            projection.ptOnSurfA = ptOnCharacter;
+            projection.ptOnSurfB = ptOnSurface;
+            projection.idBodyA = characterId;
+            projection.idBodyB = walkableCuboids[j].bodyId;
+            id = j;
+        }
+    }
+
+    if (!CheckIfObjIsOnWalkableCuboidSurface(projection.ptOnSurfB, id))
+    {
+        return;
+    }
+
+    Body* surface = physicsEngine->GetBody(projection.idBodyB);
+    surface->GetWorldSpaceFaceNormalFromPoint(&projection.ptOnSurfB, &upDir);
+
+    XMVECTOR v_upDir = XMLoadFloat3(&upDir);
+    XMVECTOR v_orientation = XMLoadFloat3(&orientationDir);
+    XMVECTOR v_projection = -v_upDir * XMVector3Dot(v_orientation, -v_upDir);
+    XMVECTOR v_forwardDir = XMVector3Normalize(v_orientation - v_projection);
+    XMStoreFloat3(&forwardDir, v_forwardDir);
+    XMStoreFloat3(&rightDir, XMVector3Normalize(XMVector3Cross(v_forwardDir, -v_upDir)));
+    //lastSurface = walkableCuboids[j].bodyId;
+
+    constForce = { 0, 0, 0 };
+    scalesVel = { 1, 1, 1 };
+    if (characterVelocity.z == 0.0f && characterVelocity.x == 0.0f && characterVelocity.y == 0.0f)
+    {
+        //dragCoeff = { 0.7f, 0.7f, 0.7f };
+    }
+    else
+    {
+        dragCoeff = { 0.99f, 0.99f, 0.99f };
+    }
+
+    if (projection.dist > 0.1f)
+    {
+        constForce = { 0, -30, 0 };
+        if (projection.dist > 0.2f)
+        {
+            dragCoeff.y = 1.0f;
+        }
+        if (projection.dist > 0.5f)
+        {
+            dragCoeff = { 0.7f, 1.0f,  0.7f };
+            scalesVel = { 0, 0, 0 };
+        }
+    }
 
 }

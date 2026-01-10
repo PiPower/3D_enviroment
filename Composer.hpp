@@ -61,6 +61,8 @@ struct Composer
 		const LinearVelocityBounds& vBounds,
 		bool allowAngularImpulse,
 		const DirectX::XMFLOAT3& constForce = { 0, -15, 0 });
+
+	void UpdateMovementVectors();
 public:
 	Renderer* renderer;
 	PhysicsEnigne* physicsEngine;
@@ -71,6 +73,7 @@ public:
 	bool calculatePhysics;
 	bool frameMode;
 	// ----- character management ----- 
+	DirectX::XMFLOAT3 scalesVel;
 	DirectX::XMFLOAT3 characterVelocity;
 	DirectX::XMFLOAT3 characterVelocityCoeff;
 	DirectX::XMFLOAT3 orientationDir;
