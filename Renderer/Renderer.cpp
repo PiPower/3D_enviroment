@@ -6,7 +6,7 @@ using namespace std;
 static constexpr uint32_t MAX_UBO_POOL_SIZE = 65536; // value from vulkan spec v1.4
 static constexpr uint32_t UBO_BUFFER_RESOURCE_TYPE = 0;
 
-#define GET_PIPELINE(type) pipelines[static_cast<uint32_t>(type)]
+static constexpr uint32_t MAIN_COMPUTE = 0;
 #define GET_BASE_SHAPE(name) baseShapesTable[static_cast<uint32_t>(name)]
 enum class ComputeLayout
 {
@@ -91,11 +91,11 @@ int64_t Renderer::CreateGraphicsPipeline(
 {
     pipelines.push_back({});
     VulkanPipelineData* pipeline = &pipelines.back();
+    pipeline->lightCount = lightCount;
 
     CreateBasicGraphicsLayout(&pipeline->descriptorSetLayout, &pipeline->pipelineLayout);
-    CreateBasicGraphicsPipelines(lightCount);
-    CreatePipelinePools();
-    CreateGraphicsSets();
+    CreateBasicGraphicsPipelines(pipeline->pipelineLayout, &pipeline->pipeline, lightCount);
+    CreateGraphicsSets(pipeline);
 
     *pipelineId = pipelines.size();
 
@@ -299,9 +299,9 @@ void Renderer::Present()
     vkCmdPipelineBarrier(vkResources.cmdBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
         0, 0, nullptr, 0, nullptr, 0, nullptr);
 
-    vkCmdBindPipeline(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, GET_PIPELINE(PipelineTypes::Compute).pipeline);
-    vkCmdBindDescriptorSets(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, GET_PIPELINE(PipelineTypes::Compute).pipelineLayout,
-        0, 1, &GET_PIPELINE(PipelineTypes::Compute).sets[imageIndex], 0, nullptr);
+    vkCmdBindPipeline(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelines[MAIN_COMPUTE].pipeline);
+    vkCmdBindDescriptorSets(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelines[MAIN_COMPUTE].pipelineLayout,
+        0, 1, &pipelines[MAIN_COMPUTE].sets[imageIndex], 0, nullptr);
 
     uint32_t x_dispatch = vkResources.swapchainInfo.capabilities.currentExtent.width;
     uint32_t y_dispatch = vkResources.swapchainInfo.capabilities.currentExtent.height;
@@ -578,35 +578,7 @@ void Renderer::CreateComputeLayout(
     EXIT_ON_VK_ERROR(vkCreatePipelineLayout(vkResources.device, &layoutInfo, nullptr, pipelineLayout));
 }
 
-void Renderer::CreatePipelinePools()
-{
-    VkDescriptorPoolSize computePoolSize[1] = {};
-    computePoolSize[0].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    computePoolSize[0].descriptorCount = CL_STORAGE_IMAGES * vkResources.renderTextures.size();
 
-    GET_PIPELINE(PipelineTypes::Compute).maxSets = vkResources.renderTextures.size();
-    VkDescriptorPoolCreateInfo computePoolDesc = {};
-    computePoolDesc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    computePoolDesc.maxSets = vkResources.renderTextures.size();
-    computePoolDesc.poolSizeCount = 1;
-    computePoolDesc.pPoolSizes = computePoolSize;
-    EXIT_ON_VK_ERROR(vkCreateDescriptorPool(vkResources.device, &computePoolDesc, nullptr, &GET_PIPELINE(PipelineTypes::Compute).descriptorPool));
-
-
-    GET_PIPELINE(PipelineTypes::Graphics).maxSets = 6;
-    GET_PIPELINE(PipelineTypes::GraphicsNonFill).maxSets = GET_PIPELINE(PipelineTypes::Graphics).maxSets;
-    VkDescriptorPoolSize gfxPoolSize[1] = {};
-    gfxPoolSize[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-    gfxPoolSize[0].descriptorCount = GFX_ENTRY_COUNT * GET_PIPELINE(PipelineTypes::Graphics).maxSets; // meaningless default value
-
-    VkDescriptorPoolCreateInfo gfxPoolDesc = {};
-    gfxPoolDesc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    gfxPoolDesc.maxSets = GET_PIPELINE(PipelineTypes::Graphics).maxSets; // meaningless default value 
-    gfxPoolDesc.poolSizeCount = 1;
-    gfxPoolDesc.pPoolSizes = gfxPoolSize;
-    EXIT_ON_VK_ERROR(vkCreateDescriptorPool(vkResources.device, &gfxPoolDesc, nullptr, &GET_PIPELINE(PipelineTypes::Graphics).descriptorPool));
-    EXIT_ON_VK_ERROR(vkCreateDescriptorPool(vkResources.device, &gfxPoolDesc, nullptr, &GET_PIPELINE(PipelineTypes::GraphicsNonFill).descriptorPool));
-}
 
 void Renderer::InitComputeSets(
     VulkanPipelineData* pipelineData)
@@ -666,8 +638,21 @@ void Renderer::InitComputeSets(
     }
 }
 
-void Renderer::CreateGraphicsSets()
+void Renderer::CreateGraphicsSets(
+    VulkanPipelineData* pipelineData)
 {
+    pipelineData->maxSets = 6;
+    VkDescriptorPoolSize gfxPoolSize[1] = {};
+    gfxPoolSize[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    gfxPoolSize[0].descriptorCount = GFX_ENTRY_COUNT * pipelineData->maxSets; 
+
+    VkDescriptorPoolCreateInfo gfxPoolDesc = {};
+    gfxPoolDesc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    gfxPoolDesc.maxSets = pipelineData->maxSets;
+    gfxPoolDesc.poolSizeCount = 1;
+    gfxPoolDesc.pPoolSizes = gfxPoolSize;
+    EXIT_ON_VK_ERROR(vkCreateDescriptorPool(vkResources.device, &gfxPoolDesc, nullptr, &pipelineData->descriptorPool));
+
     for (size_t pipelineId = 1; pipelineId < pipelines.size(); pipelineId++)
     {
         VulkanPipelineData* pipeline = &pipelines[pipelineId];
@@ -716,6 +701,8 @@ void Renderer::CreateBasicGraphicsLayout(
 }
 
 void Renderer::CreateBasicGraphicsPipelines(
+    VkPipelineLayout pipelineLayout,
+    VkPipeline* pipeline,
     uint8_t lightCount)
 {
     ShaderOptions opts;
@@ -844,25 +831,17 @@ void Renderer::CreateBasicGraphicsPipelines(
     pipelineInfo.pViewportState = &vpInfo;
     pipelineInfo.pRasterizationState = &rasterInfo;
     pipelineInfo.pMultisampleState = &multisampling;
-    pipelineInfo.pDepthStencilState = &depthInfo; // Optional
+    pipelineInfo.pDepthStencilState = &depthInfo;
     pipelineInfo.pColorBlendState = &blendInfo;
     pipelineInfo.pDynamicState = &dynamicState;
-    pipelineInfo.layout = GET_PIPELINE(PipelineTypes::Graphics).pipelineLayout;
+    pipelineInfo.layout = pipelineLayout;
     pipelineInfo.renderPass = vkResources.renderPass;
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.basePipelineIndex = -1;
 
-    EXIT_ON_VK_ERROR(vkCreateGraphicsPipelines(vkResources.device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, 
-                                                                &GET_PIPELINE(PipelineTypes::Graphics).pipeline));
-    GET_PIPELINE(PipelineTypes::Graphics).lightCount = lightCount;
-    rasterInfo.polygonMode = VK_POLYGON_MODE_LINE;
-    pipelineInfo.layout = GET_PIPELINE(PipelineTypes::GraphicsNonFill).pipelineLayout;
-
-    EXIT_ON_VK_ERROR(vkCreateGraphicsPipelines(vkResources.device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, 
-                                                        &GET_PIPELINE(PipelineTypes::GraphicsNonFill).pipeline));
-    GET_PIPELINE(PipelineTypes::GraphicsNonFill).lightCount = lightCount;
-
+    EXIT_ON_VK_ERROR(vkCreateGraphicsPipelines(vkResources.device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, pipeline));
+ 
     vkDestroyShaderModule(vkResources.device, fragmentShader, nullptr);
     vkDestroyShaderModule(vkResources.device, vertexShader, nullptr);
 }

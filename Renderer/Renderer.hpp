@@ -79,16 +79,17 @@ private:
 		VkDescriptorSetLayout* setLayout,
 		VkPipelineLayout* pipelineLayout);
 
-	void CreatePipelinePools();
-
 	void CreateBasicGraphicsLayout(
 		VkDescriptorSetLayout* setLayout,
 		VkPipelineLayout* pipelineLayout);
 
 	void CreateBasicGraphicsPipelines(
+		VkPipelineLayout pipelineLayout,
+		VkPipeline* pipeline,
 		uint8_t lightCount);
 
-	void CreateGraphicsSets();
+	void CreateGraphicsSets(
+		VulkanPipelineData* pipelineData);
 
 	void InitComputeSets(
 		VulkanPipelineData* pipelineData);
