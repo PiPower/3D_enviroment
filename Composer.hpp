@@ -30,8 +30,7 @@ struct Composer
 {
 	Composer(
 		Renderer* renderer,
-		PhysicsEnigne* physicsEngine,
-		const std::vector<Light>& lights);
+		PhysicsEnigne* physicsEngine);
 
 	void RenderScene();
 
@@ -72,6 +71,7 @@ public:
 	uint64_t uboPool;
 	bool calculatePhysics;
 	bool frameMode;
+	uint64_t pipelineId;
 	// ----- character management ----- 
 	DirectX::XMFLOAT3 scalesVel;
 	DirectX::XMFLOAT3 characterVelocity;

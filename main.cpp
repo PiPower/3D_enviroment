@@ -11,8 +11,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
     Window wnd(1600, 900, L"yolo", L"test");
     Renderer renderer(hInstance, wnd.GetWindowHWND(), LIGHTS);
     PhysicsEnigne physicsEngine{};
-    std::vector<Light> lights = { Light{{1, 1, 1, 1.0f}, {0.0f, 100.0f, 0.0f, 0.2f} } };
-    Composer comp(&renderer, &physicsEngine, lights);
+    Composer comp(&renderer, &physicsEngine);
 
 
     float dt = 0.001;

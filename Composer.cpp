@@ -21,8 +21,7 @@ struct PointProjection
 
 Composer::Composer(
     Renderer* renderer,
-    PhysicsEnigne* physicsEngine,
-    const std::vector<Light>& lights)
+    PhysicsEnigne* physicsEngine)
     :
     cameraAngleX(0), cameraAngleY(0), camOrientation(eyeInitial, upInitial, lookDirInitial),
     renderer(renderer), physicsEngine(physicsEngine), calculatePhysics(true), frameMode(true),
@@ -30,6 +29,8 @@ Composer::Composer(
     orientationDir({ 1, 0, 0 }), forwardDir({ 1, 0, 0 }), upDir({ 0,1,0 }), rightDir({ 0,0,-1 }),
     characterVelocityCoeff({ 70000, 70000, 70000 }), freeFall(true), scalesVel({1.0f, 1.0f, 1.0f})
 {
+    std::vector<Light> lights = { Light{{1, 1, 1, 1.0f}, {0.0f, 100.0f, 0.0f, 0.2f} } };
+    renderer->CreateGraphicsPipeline(lights.size(), &pipelineId);
 
     vector<GeometryEntry> boxGeo({ GeometryType::Box });
     renderer->CreateMeshCollection(boxGeo, &boxCollection);

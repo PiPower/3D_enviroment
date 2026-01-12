@@ -38,7 +38,6 @@ const Geometry* baseShapesTable[]
 Renderer::Renderer(
     HINSTANCE hinstance,
     HWND hwnd,
-    uint8_t lightCount,
     VkDeviceSize stagingSize)
 	:
 	windowHwnd(hwnd), compiler(), pipelines(3), maxUboPoolSize(65536)
@@ -49,13 +48,12 @@ Renderer::Renderer(
                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &stagingBuffer);
     EXIT_ON_VK_ERROR(vkMapMemory(vkResources.device, stagingBuffer.deviceMemory, 0, stagingBuffer.requirements.size, 0, (void**) & stagingPtr));
     CreateControllingStructs();
-    CreateComputeLayout();
-    CreateComputePipeline();
-    CreateBasicGraphicsLayout();
-    CreateBasicGraphicsPipelines(lightCount);
-    CreatePipelinePools();
-    UpdateComputeSets();
-    CreateGraphicsSets();
+    pipelines.push_back({});
+    VulkanPipelineData* pipeline = &pipelines.back();
+
+    CreateComputeLayout(&pipeline->descriptorSetLayout, &pipeline->pipelineLayout);
+    CreateComputePipeline(pipeline->pipelineLayout, &pipeline->pipeline);
+    InitComputeSets(pipeline);
 }
 
 void Renderer::BeginRendering()
@@ -85,6 +83,23 @@ void Renderer::BeginRendering()
     scissor.offset = { 0, 0 };
     scissor.extent = vkResources.swapchainInfo.capabilities.currentExtent;
     vkCmdSetScissor(vkResources.cmdBuffer, 0, 1, &scissor);
+}
+
+int64_t Renderer::CreateGraphicsPipeline(
+    uint8_t lightCount,
+    uint64_t* pipelineId)
+{
+    pipelines.push_back({});
+    VulkanPipelineData* pipeline = &pipelines.back();
+
+    CreateBasicGraphicsLayout(&pipeline->descriptorSetLayout, &pipeline->pipelineLayout);
+    CreateBasicGraphicsPipelines(lightCount);
+    CreatePipelinePools();
+    CreateGraphicsSets();
+
+    *pipelineId = pipelines.size();
+
+    return 0;
 }
 
 int64_t Renderer::UpdateUboMemory(
@@ -507,12 +522,12 @@ void Renderer::CreateControllingStructs()
     computeSwapchainCopy.extent = { vkResources.swapchainInfo.capabilities.currentExtent.width, vkResources.swapchainInfo.capabilities.currentExtent.height, 1 };
 }
 
-void Renderer::CreateComputePipeline()
+void Renderer::CreateComputePipeline(
+    VkPipelineLayout pipelineLayout,
+    VkPipeline* pipeline)
 {
-
     ShaderOptions options = {};
     VkShaderModule computeShader = compiler.CompileShaderFromPath(vkResources.device, nullptr, "shaders/post_process.comp", "main", shaderc_compute_shader, options);
-
 
     VkPipelineShaderStageCreateInfo shaderInfo = {};
     shaderInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -524,17 +539,19 @@ void Renderer::CreateComputePipeline()
 
     VkComputePipelineCreateInfo computeInfo = {};
     computeInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-    computeInfo.layout = GET_PIPELINE(PipelineTypes::Compute).pipelineLayout;
+    computeInfo.layout = pipelineLayout;
     computeInfo.stage = shaderInfo;
     computeInfo.basePipelineHandle = VK_NULL_HANDLE;
     computeInfo.basePipelineIndex = -1;
 
-    EXIT_ON_VK_ERROR(vkCreateComputePipelines(vkResources.device, VK_NULL_HANDLE, 1, &computeInfo, nullptr, &GET_PIPELINE(PipelineTypes::Compute).pipeline));
+    EXIT_ON_VK_ERROR(vkCreateComputePipelines(vkResources.device, VK_NULL_HANDLE, 1, &computeInfo, nullptr, pipeline));
 
     vkDestroyShaderModule(vkResources.device, computeShader, nullptr);
 }
 
-void Renderer::CreateComputeLayout()
+void Renderer::CreateComputeLayout(
+    VkDescriptorSetLayout* setLayout,
+    VkPipelineLayout* pipelineLayout)
 {
     VkDescriptorSetLayoutBinding bindings[2] = {};
     bindings[0].binding = CL_RENDER_TEXTURE;
@@ -551,14 +568,14 @@ void Renderer::CreateComputeLayout()
     setInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     setInfo.bindingCount = 2;
     setInfo.pBindings = bindings;
-    EXIT_ON_VK_ERROR(vkCreateDescriptorSetLayout(vkResources.device, &setInfo, nullptr, &GET_PIPELINE(PipelineTypes::Compute).descriptorSetLayout));
+    EXIT_ON_VK_ERROR(vkCreateDescriptorSetLayout(vkResources.device, &setInfo, nullptr, setLayout));
 
     VkPipelineLayoutCreateInfo layoutInfo = {};
     layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     layoutInfo.setLayoutCount = 1;
-    layoutInfo.pSetLayouts = &GET_PIPELINE(PipelineTypes::Compute).descriptorSetLayout;
+    layoutInfo.pSetLayouts = setLayout;
 
-    EXIT_ON_VK_ERROR(vkCreatePipelineLayout(vkResources.device, &layoutInfo, nullptr, &GET_PIPELINE(PipelineTypes::Compute).pipelineLayout));
+    EXIT_ON_VK_ERROR(vkCreatePipelineLayout(vkResources.device, &layoutInfo, nullptr, pipelineLayout));
 }
 
 void Renderer::CreatePipelinePools()
@@ -591,18 +608,31 @@ void Renderer::CreatePipelinePools()
     EXIT_ON_VK_ERROR(vkCreateDescriptorPool(vkResources.device, &gfxPoolDesc, nullptr, &GET_PIPELINE(PipelineTypes::GraphicsNonFill).descriptorPool));
 }
 
-void Renderer::UpdateComputeSets()
+void Renderer::InitComputeSets(
+    VulkanPipelineData* pipelineData)
 {
-    vector<VkDescriptorSetLayout> layouts(vkResources.renderTextures.size(), GET_PIPELINE(PipelineTypes::Compute).descriptorSetLayout);
-    vector<VkDescriptorSet> sets(vkResources.renderTextures.size());
+    VkDescriptorPoolSize computePoolSize[1] = {};
+    computePoolSize[0].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    computePoolSize[0].descriptorCount = CL_STORAGE_IMAGES * vkResources.renderTextures.size();
+    pipelineData->maxSets = vkResources.renderTextures.size();
+
+    VkDescriptorPoolCreateInfo computePoolDesc = {};
+    computePoolDesc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    computePoolDesc.maxSets = pipelineData->maxSets;
+    computePoolDesc.poolSizeCount = 1;
+    computePoolDesc.pPoolSizes = computePoolSize;
+    EXIT_ON_VK_ERROR(vkCreateDescriptorPool(vkResources.device, &computePoolDesc, nullptr, &pipelineData->descriptorPool));
+
+
+    pipelineData->sets.resize(vkResources.renderTextures.size());
+    vector<VkDescriptorSetLayout> layouts(vkResources.renderTextures.size(), pipelineData->descriptorSetLayout);
     VkDescriptorSetAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = GET_PIPELINE(PipelineTypes::Compute).descriptorPool;
+    allocInfo.descriptorPool = pipelineData->descriptorPool;
     allocInfo.descriptorSetCount = layouts.size();
     allocInfo.pSetLayouts = layouts.data();
 
-    GET_PIPELINE(PipelineTypes::Compute).sets.resize(vkResources.renderTextures.size());
-    EXIT_ON_VK_ERROR(vkAllocateDescriptorSets(vkResources.device, &allocInfo, GET_PIPELINE(PipelineTypes::Compute).sets.data()) );
+    EXIT_ON_VK_ERROR(vkAllocateDescriptorSets(vkResources.device, &allocInfo, pipelineData->sets.data()) );
 
     for (size_t i = 0; i < vkResources.renderTextures.size(); i++)
     {
@@ -617,7 +647,7 @@ void Renderer::UpdateComputeSets()
 
         VkWriteDescriptorSet computeWrite[CL_STORAGE_IMAGES] = {};
         computeWrite[CL_RENDER_TEXTURE].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        computeWrite[CL_RENDER_TEXTURE].dstSet = GET_PIPELINE(PipelineTypes::Compute).sets[i];
+        computeWrite[CL_RENDER_TEXTURE].dstSet = pipelineData->sets[i];
         computeWrite[CL_RENDER_TEXTURE].dstBinding = CL_RENDER_TEXTURE;
         computeWrite[CL_RENDER_TEXTURE].dstArrayElement = 0;
         computeWrite[CL_RENDER_TEXTURE].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
@@ -625,7 +655,7 @@ void Renderer::UpdateComputeSets()
         computeWrite[CL_RENDER_TEXTURE].pImageInfo = &computeImgInfo[CL_RENDER_TEXTURE];
 
         computeWrite[CL_COMPUTE_TEXTURE].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        computeWrite[CL_COMPUTE_TEXTURE].dstSet = GET_PIPELINE(PipelineTypes::Compute).sets[i];
+        computeWrite[CL_COMPUTE_TEXTURE].dstSet = pipelineData->sets[i];
         computeWrite[CL_COMPUTE_TEXTURE].dstBinding = CL_COMPUTE_TEXTURE;
         computeWrite[CL_COMPUTE_TEXTURE].dstArrayElement = 0;
         computeWrite[CL_COMPUTE_TEXTURE].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
@@ -655,7 +685,9 @@ void Renderer::CreateGraphicsSets()
     }
 }
 
-void Renderer::CreateBasicGraphicsLayout()
+void Renderer::CreateBasicGraphicsLayout(
+    VkDescriptorSetLayout* setLayout, 
+    VkPipelineLayout* pipelineLayout)
 {
     VkDescriptorSetLayoutBinding bindings[2] = {};
     bindings[0].binding = 0;
@@ -674,22 +706,13 @@ void Renderer::CreateBasicGraphicsLayout()
     descSetLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     descSetLayoutInfo.bindingCount = 2;
     descSetLayoutInfo.pBindings = bindings;
-    EXIT_ON_VK_ERROR(vkCreateDescriptorSetLayout(vkResources.device, &descSetLayoutInfo, nullptr, 
-                                            &GET_PIPELINE(PipelineTypes::Graphics).descriptorSetLayout));
-    EXIT_ON_VK_ERROR(vkCreateDescriptorSetLayout(vkResources.device, &descSetLayoutInfo, nullptr, 
-                                        &GET_PIPELINE(PipelineTypes::GraphicsNonFill).descriptorSetLayout));
+    EXIT_ON_VK_ERROR(vkCreateDescriptorSetLayout(vkResources.device, &descSetLayoutInfo, nullptr, setLayout));
 
     VkPipelineLayoutCreateInfo layoutInfoGraphics = {};
     layoutInfoGraphics.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     layoutInfoGraphics.setLayoutCount = 1;
-    layoutInfoGraphics.pSetLayouts = &GET_PIPELINE(PipelineTypes::Graphics).descriptorSetLayout;
-    EXIT_ON_VK_ERROR(vkCreatePipelineLayout(vkResources.device, &layoutInfoGraphics, nullptr, &GET_PIPELINE(PipelineTypes::Graphics).pipelineLayout));
-
-    VkPipelineLayoutCreateInfo layoutInfoGraphicsNonFill = {};
-    layoutInfoGraphicsNonFill.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    layoutInfoGraphicsNonFill.setLayoutCount = 1;
-    layoutInfoGraphicsNonFill.pSetLayouts = &GET_PIPELINE(PipelineTypes::GraphicsNonFill).descriptorSetLayout;
-    EXIT_ON_VK_ERROR(vkCreatePipelineLayout(vkResources.device, &layoutInfoGraphicsNonFill, nullptr, &GET_PIPELINE(PipelineTypes::GraphicsNonFill).pipelineLayout));
+    layoutInfoGraphics.pSetLayouts = setLayout;
+    EXIT_ON_VK_ERROR(vkCreatePipelineLayout(vkResources.device, &layoutInfoGraphics, nullptr, pipelineLayout));
 }
 
 void Renderer::CreateBasicGraphicsPipelines(

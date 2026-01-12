@@ -19,10 +19,14 @@ public:
 	Renderer(
 		HINSTANCE hinstance, 
 		HWND hwnd,
-		uint8_t lightCount,
 		VkDeviceSize stagingSize = 1'000'000);
 
 	void BeginRendering();
+
+	int64_t CreateGraphicsPipeline(
+		uint8_t lightCount, 
+		uint64_t* pipelineId);
+
 	/*
 		maximum number of render items per mesh collection is 0xFFFFFFFFFFFF
 	*/
@@ -66,14 +70,28 @@ public:
 
 private:
 	void CreateControllingStructs();
-	void CreateComputePipeline();
-	void CreateComputeLayout();
+
+	void CreateComputePipeline(
+		VkPipelineLayout pipelineLayout,
+		VkPipeline* pipeline);
+
+	void CreateComputeLayout(
+		VkDescriptorSetLayout* setLayout,
+		VkPipelineLayout* pipelineLayout);
+
 	void CreatePipelinePools();
-	void CreateBasicGraphicsLayout();
+
+	void CreateBasicGraphicsLayout(
+		VkDescriptorSetLayout* setLayout,
+		VkPipelineLayout* pipelineLayout);
+
 	void CreateBasicGraphicsPipelines(
 		uint8_t lightCount);
+
 	void CreateGraphicsSets();
-	void UpdateComputeSets();
+
+	void InitComputeSets(
+		VulkanPipelineData* pipelineData);
 private:
 	uint32_t imageIndex;
 	VkDeviceSize maxUboPoolSize;
