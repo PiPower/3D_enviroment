@@ -40,7 +40,7 @@ Renderer::Renderer(
     HWND hwnd,
     VkDeviceSize stagingSize)
 	:
-	windowHwnd(hwnd), compiler(), pipelines(3), maxUboPoolSize(65536)
+	windowHwnd(hwnd), compiler(), pipelines(1), maxUboPoolSize(65536)
 {
 	createVulkanResources(&vkResources, hinstance, windowHwnd);
 
@@ -48,9 +48,8 @@ Renderer::Renderer(
                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &stagingBuffer);
     EXIT_ON_VK_ERROR(vkMapMemory(vkResources.device, stagingBuffer.deviceMemory, 0, stagingBuffer.requirements.size, 0, (void**) & stagingPtr));
     CreateControllingStructs();
-    pipelines.push_back({});
-    VulkanPipelineData* pipeline = &pipelines.back();
 
+    VulkanPipelineData* pipeline = &pipelines.back();
     CreateComputeLayout(&pipeline->descriptorSetLayout, &pipeline->pipelineLayout);
     CreateComputePipeline(pipeline->pipelineLayout, &pipeline->pipeline);
     InitComputeSets(pipeline);
@@ -653,21 +652,16 @@ void Renderer::CreateGraphicsSets(
     gfxPoolDesc.pPoolSizes = gfxPoolSize;
     EXIT_ON_VK_ERROR(vkCreateDescriptorPool(vkResources.device, &gfxPoolDesc, nullptr, &pipelineData->descriptorPool));
 
-    for (size_t pipelineId = 1; pipelineId < pipelines.size(); pipelineId++)
-    {
-        VulkanPipelineData* pipeline = &pipelines[pipelineId];
-        pipeline->sets.resize(pipeline->maxSets);
+    pipelineData->sets.resize(pipelineData->maxSets);
+    vector<VkDescriptorSetLayout> layouts(pipelineData->maxSets, pipelineData->descriptorSetLayout);
+    VkDescriptorSetAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = pipelineData->descriptorPool;
+    allocInfo.descriptorSetCount = layouts.size();
+    allocInfo.pSetLayouts = layouts.data();
 
-        vector<VkDescriptorSetLayout> layouts(pipeline->maxSets, pipeline->descriptorSetLayout);
-        vector<VkDescriptorSet> sets(pipeline->maxSets);
-        VkDescriptorSetAllocateInfo allocInfo = {};
-        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocInfo.descriptorPool = pipeline->descriptorPool;
-        allocInfo.descriptorSetCount = layouts.size();
-        allocInfo.pSetLayouts = layouts.data();
-
-        EXIT_ON_VK_ERROR(vkAllocateDescriptorSets(vkResources.device, &allocInfo, pipeline->sets.data()));
-    }
+    EXIT_ON_VK_ERROR(vkAllocateDescriptorSets(vkResources.device, &allocInfo, pipelineData->sets.data()));
+    
 }
 
 void Renderer::CreateBasicGraphicsLayout(
