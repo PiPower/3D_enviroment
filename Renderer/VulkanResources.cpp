@@ -756,7 +756,7 @@ static VkSwapchainKHR createSwapchain(
 	size_t i;
 	for (i = 0; i < swapchainInfo.formats.size(); i++)
 	{
-		if (swapchainInfo.formats[i].format == VK_FORMAT_R8G8B8A8_UNORM)
+		if (swapchainInfo.formats[i].format == SURFACE_FORMAT)
 		{
 			break;
 		}

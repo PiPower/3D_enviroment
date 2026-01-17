@@ -102,6 +102,10 @@ private:
 
 	void CreateSampler(
 		VulkanPipelineData* pipelineData);
+
+	void PrepareTextureData(
+		VulkanPipelineData* pipelineData);
+
 private:
 	uint32_t imageIndex;
 	VkDeviceSize maxUboPoolSize;

@@ -106,14 +106,7 @@ int64_t Renderer::CreateGraphicsPipeline(
     CreateBasicGraphicsVkPipeline(pipeline->pipelineLayout, &pipeline->pipeline, lightCount, pipeline->texDims.size());
     CreateGraphicsSets(pipeline);
     CreateSampler(pipeline);
-    for (size_t i = 0; i < textureDims.size(); i++)
-    {
-        Texture tex = createTexture2D(vkResources.device, vkResources.physicalDevice,
-            pipeline->texDims[i].width, pipeline->texDims[i].height, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT);
-        pipeline->textures.push_back(std::move(tex));
-    }
-
-
+    PrepareTextureData(pipeline);
     SetImageSets(pipeline);
     *pipelineId = pipelines.size() - 1;
     return 0;
@@ -683,8 +676,6 @@ void Renderer::SetImageSets(
     }
 
     vkUpdateDescriptorSets(vkResources.device, updates.size(), updates.data(), 0, nullptr);
-    int x = 2;
-
 }
 
 void Renderer::CreateSampler(
@@ -709,6 +700,54 @@ void Renderer::CreateSampler(
     samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 
     EXIT_ON_VK_ERROR(vkCreateSampler(vkResources.device, &samplerInfo, nullptr, &pipelineData->sampler));
+}
+
+void Renderer::PrepareTextureData(
+    VulkanPipelineData* pipelineData)
+{
+    for (size_t i = 0; i < pipelineData->texDims.size(); i++)
+    {
+        Texture tex = createTexture2D(vkResources.device, vkResources.physicalDevice,
+            pipelineData->texDims[i].width, pipelineData->texDims[i].height, SURFACE_FORMAT, VK_IMAGE_USAGE_SAMPLED_BIT);
+        pipelineData->textures.push_back(std::move(tex));
+    }
+
+    vector<VkImageMemoryBarrier> barriers(pipelineData->texDims.size());
+    for (size_t i = 0; i < pipelineData->texDims.size(); i++)
+    {
+        barriers[i] = {};
+        barriers[i].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barriers[i].srcAccessMask = 0;
+        barriers[i].dstAccessMask = 0;
+        barriers[i].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        barriers[i].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        barriers[i].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barriers[i].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barriers[i].image = pipelineData->textures[i].texImage;
+        barriers[i].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        barriers[i].subresourceRange.baseMipLevel = 0;
+        barriers[i].subresourceRange.levelCount = 1;
+        barriers[i].subresourceRange.baseArrayLayer = 0;
+        barriers[i].subresourceRange.layerCount = 1;
+    }
+
+    VkCommandBufferBeginInfo cmdBuffInfo = {};
+    cmdBuffInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    cmdBuffInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    EXIT_ON_VK_ERROR(vkResetCommandBuffer(vkResources.cmdBuffer, 0));
+    EXIT_ON_VK_ERROR(vkBeginCommandBuffer(vkResources.cmdBuffer, &cmdBuffInfo));
+
+    vkCmdPipelineBarrier(vkResources.cmdBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, barriers.size(), barriers.data());
+
+    EXIT_ON_VK_ERROR(vkEndCommandBuffer(vkResources.cmdBuffer));
+    VkSubmitInfo submitInfo = {};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &vkResources.cmdBuffer;
+    EXIT_ON_VK_ERROR(vkQueueSubmit(vkResources.graphicsQueue, 1, &submitInfo, nullptr));
+    EXIT_ON_VK_ERROR(vkQueueWaitIdle(vkResources.graphicsQueue));
+
 }
 
 void Renderer::CreateGraphicsSets(
