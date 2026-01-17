@@ -717,8 +717,8 @@ void Renderer::PrepareTextureData(
     {
         barriers[i] = {};
         barriers[i].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barriers[i].srcAccessMask = 0;
-        barriers[i].dstAccessMask = 0;
+        barriers[i].srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+        barriers[i].dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
         barriers[i].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         barriers[i].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         barriers[i].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
