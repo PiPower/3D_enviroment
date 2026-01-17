@@ -68,7 +68,7 @@ VkShaderModule ShaderCompiler::CompileShader(
         for (size_t i = 0; i < options.name.size(); i++)
         {
             const char* name = options.name[i].c_str();
-            size_t nameLen = options.name[i].length() - 1;
+            size_t nameLen = options.name[i].length();
             const char* value = options.value[i].length() == 0 ? nullptr : options.value[i].c_str();
             size_t valueLen = options.value[i].length() == 0 ? 0 : options.value[i].length();
 
