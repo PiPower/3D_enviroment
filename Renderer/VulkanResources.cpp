@@ -808,7 +808,7 @@ static VkSwapchainKHR createSwapchain(
 	return swapchain;
 }
 
-static Texture createTexture2D(
+Texture createTexture2D(
 	VkDevice device,
 	VkPhysicalDevice physicalDevice,
 	uint32_t width,
@@ -862,7 +862,6 @@ static VkDeviceMemory allocateBuffer_temp(
 	VkMemoryRequirements memRequirements,
 	VkMemoryPropertyFlags properties)
 {
-	VkDeviceMemory devMem;
 	VkPhysicalDeviceMemoryProperties memProperties;
 	vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
 	uint32_t i;
@@ -874,11 +873,17 @@ static VkDeviceMemory allocateBuffer_temp(
 		}
 	}
 
+	if (i == memProperties.memoryTypeCount)
+	{
+		return nullptr;
+	}
+
 	VkMemoryAllocateInfo allocInfo = {};
 	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	allocInfo.allocationSize = memRequirements.size;
 	allocInfo.memoryTypeIndex = i;
 
+	VkDeviceMemory devMem;
 	EXIT_ON_VK_ERROR(vkAllocateMemory(device, &allocInfo, nullptr, &devMem));
 	return devMem;
 }

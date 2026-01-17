@@ -53,14 +53,6 @@ static VkSwapchainKHR createSwapchain(
 	const QueuesIdx& queuesIdx,
 	VkFormat* chosenFormat);
 
-static Texture createTexture2D(
-	VkDevice device,
-	VkPhysicalDevice physicalDevice,
-	uint32_t width,
-	uint32_t height,
-	VkFormat format,
-	VkImageUsageFlags usage);
-
 static VkDeviceMemory allocateBuffer_temp(
 	VkDevice device, 
 	VkPhysicalDevice physicalDevice,

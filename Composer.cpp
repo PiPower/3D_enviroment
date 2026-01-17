@@ -8,7 +8,6 @@ static constexpr XMFLOAT3 gravityForce = { 0, -15, 0 };
 static constexpr XMFLOAT3 eyeInitial = { -10.0f, 9.0f, -25.0f };
 static constexpr XMFLOAT3 lookDirInitial = { 0.0f, 0.0f, 1.0f };
 static constexpr XMFLOAT3 upInitial = { 0.0f, 1.0f, 0.0f };
-static constexpr uint64_t graphicsPipelineType = (uint64_t)PipelineTypes::Graphics;
 
 struct PointProjection
 {
@@ -29,14 +28,15 @@ Composer::Composer(
     orientationDir({ 1, 0, 0 }), forwardDir({ 1, 0, 0 }), upDir({ 0,1,0 }), rightDir({ 0,0,-1 }),
     characterVelocityCoeff({ 70000, 70000, 70000 }), freeFall(true), scalesVel({1.0f, 1.0f, 1.0f})
 {
-    std::vector<Light> lights = { Light{{1, 1, 1, 1.0f}, {0.0f, 100.0f, 0.0f, 0.2f} } };
-    renderer->CreateGraphicsPipeline(lights.size(), &pipelineId);
+    vector<Light> lights = { Light{{1, 1, 1, 1.0f}, {0.0f, 100.0f, 0.0f, 0.2f} } };
+    vector<TextureDim> dims(10, TextureDim{ 300, 300});
+    renderer->CreateGraphicsPipeline(lights.size(), dims ,&pipelineId);
 
     vector<GeometryEntry> boxGeo({ GeometryType::Box });
     renderer->CreateMeshCollection(boxGeo, &boxCollection);
     renderer->CreateUboPool(sizeof(Camera) + lights.size() * sizeof(Light), sizeof(ObjectUbo), 300'000, &uboPool);
     renderer->AllocateUboResource(uboPool, UBO_GLOBAL_RESOURCE_TYPE, &globalUbo);
-    renderer->BindUboPoolToPipeline(graphicsPipelineType, uboPool, globalUbo);
+    renderer->BindUboPoolToPipeline(pipelineId, uboPool, globalUbo);
 
     globalUboBuffer = new char[sizeof(Camera) + lights.size() * sizeof(Light)];
     memcpy(globalUboBuffer + sizeof(Camera), lights.data(), lights.size() * sizeof(Light));
@@ -55,7 +55,7 @@ void Composer::RenderScene()
     UpdateCamera();
 
     renderer->BeginRendering();
-    renderer->Render(boxCollection, graphicsPipelineType, renderEntities);
+    renderer->Render(boxCollection, pipelineId, renderEntities);
     renderer->Present();
 }
 

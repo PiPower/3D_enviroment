@@ -23,11 +23,13 @@ enum class GraphicsLayout
 {
     GlobalUbo = 0,
     ObjectUbo,
-    GfxEntryCount
+    SampledImages,
+    GfxEntryCount,
 };
 
 static constexpr uint32_t GFX_CAMERA_UBO = static_cast<uint32_t>(GraphicsLayout::GlobalUbo);
 static constexpr uint32_t GFX_OBJECT_UBO = static_cast<uint32_t>(GraphicsLayout::ObjectUbo);
+static constexpr uint32_t GFX_SAMPLED_IMAGE = static_cast<uint32_t>(GraphicsLayout::SampledImages);
 static constexpr uint32_t GFX_ENTRY_COUNT = static_cast<uint32_t>(GraphicsLayout::GfxEntryCount);
 
 const Geometry* baseShapesTable[]
@@ -86,18 +88,34 @@ void Renderer::BeginRendering()
 
 int64_t Renderer::CreateGraphicsPipeline(
     uint8_t lightCount,
+    const std::vector<TextureDim>& textureDims,
     uint64_t* pipelineId)
 {
+
+    if (textureDims.size() > 0xFFu)
+    {
+        return -2;
+    }
+
     pipelines.push_back({});
     VulkanPipelineData* pipeline = &pipelines.back();
     pipeline->lightCount = lightCount;
+    pipeline->texDims = textureDims;
 
-    CreateBasicGraphicsLayout(&pipeline->descriptorSetLayout, &pipeline->pipelineLayout);
-    CreateBasicGraphicsPipelines(pipeline->pipelineLayout, &pipeline->pipeline, lightCount);
+    CreateBasicGraphicsLayout(pipeline->texDims.size(), &pipeline->descriptorSetLayout, &pipeline->pipelineLayout);
+    CreateBasicGraphicsVkPipeline(pipeline->pipelineLayout, &pipeline->pipeline, lightCount, pipeline->texDims.size());
     CreateGraphicsSets(pipeline);
+    CreateSampler(pipeline);
+    for (size_t i = 0; i < textureDims.size(); i++)
+    {
+        Texture tex = createTexture2D(vkResources.device, vkResources.physicalDevice,
+            pipeline->texDims[i].width, pipeline->texDims[i].height, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT);
+        pipeline->textures.push_back(std::move(tex));
+    }
 
-    *pipelineId = pipelines.size();
 
+    SetImageSets(pipeline);
+    *pipelineId = pipelines.size() - 1;
     return 0;
 }
 
@@ -637,18 +655,76 @@ void Renderer::InitComputeSets(
     }
 }
 
+void Renderer::SetImageSets(
+    VulkanPipelineData* pipelineData)
+{
+    vector<VkDescriptorImageInfo> texInfos(pipelineData->textures.size());
+
+    for (int i = 0; i < texInfos.size(); i++)
+    {
+        texInfos[i] = {};
+        texInfos[i].imageView = pipelineData->textures[i].texView;
+        texInfos[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        texInfos[i].sampler = pipelineData->sampler;
+    }
+
+
+    vector<VkWriteDescriptorSet> updates(pipelineData->sets.size());
+    for (int i = 0; i < updates.size(); i++)
+    {
+        updates[i] = {};
+        updates[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        updates[i].dstSet = pipelineData->sets[i];
+        updates[i].dstBinding = GFX_SAMPLED_IMAGE;
+        updates[i].dstArrayElement = 0;
+        updates[i].descriptorCount = texInfos.size();
+        updates[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        updates[i].pImageInfo = texInfos.data();
+    }
+
+    vkUpdateDescriptorSets(vkResources.device, updates.size(), updates.data(), 0, nullptr);
+    int x = 2;
+
+}
+
+void Renderer::CreateSampler(
+    VulkanPipelineData* pipelineData)
+{
+    VkPhysicalDeviceProperties properties{};
+    vkGetPhysicalDeviceProperties(vkResources.physicalDevice, &properties);
+
+    VkSamplerCreateInfo samplerInfo = {};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_NEAREST;
+    samplerInfo.minFilter = VK_FILTER_NEAREST;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.anisotropyEnable = VK_TRUE;
+    samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+
+    EXIT_ON_VK_ERROR(vkCreateSampler(vkResources.device, &samplerInfo, nullptr, &pipelineData->sampler));
+}
+
 void Renderer::CreateGraphicsSets(
     VulkanPipelineData* pipelineData)
 {
     pipelineData->maxSets = 6;
-    VkDescriptorPoolSize gfxPoolSize[1] = {};
+    VkDescriptorPoolSize gfxPoolSize[2] = {};
     gfxPoolSize[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
     gfxPoolSize[0].descriptorCount = GFX_ENTRY_COUNT * pipelineData->maxSets; 
+    gfxPoolSize[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    gfxPoolSize[1].descriptorCount = pipelineData->texDims.size() * pipelineData->maxSets;
 
     VkDescriptorPoolCreateInfo gfxPoolDesc = {};
     gfxPoolDesc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     gfxPoolDesc.maxSets = pipelineData->maxSets;
-    gfxPoolDesc.poolSizeCount = 1;
+    gfxPoolDesc.poolSizeCount = 2;
     gfxPoolDesc.pPoolSizes = gfxPoolSize;
     EXIT_ON_VK_ERROR(vkCreateDescriptorPool(vkResources.device, &gfxPoolDesc, nullptr, &pipelineData->descriptorPool));
 
@@ -665,10 +741,11 @@ void Renderer::CreateGraphicsSets(
 }
 
 void Renderer::CreateBasicGraphicsLayout(
+    uint8_t textureCount,
     VkDescriptorSetLayout* setLayout, 
     VkPipelineLayout* pipelineLayout)
 {
-    VkDescriptorSetLayoutBinding bindings[2] = {};
+    VkDescriptorSetLayoutBinding bindings[3] = {};
     bindings[0].binding = 0;
     bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
     bindings[0].descriptorCount = 1;
@@ -681,9 +758,15 @@ void Renderer::CreateBasicGraphicsLayout(
     bindings[1].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     bindings[1].pImmutableSamplers = nullptr;
 
+    bindings[2].binding = 2;
+    bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[2].descriptorCount = textureCount;
+    bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings[2].pImmutableSamplers = nullptr;
+
     VkDescriptorSetLayoutCreateInfo descSetLayoutInfo = {};
     descSetLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    descSetLayoutInfo.bindingCount = 2;
+    descSetLayoutInfo.bindingCount = 3;
     descSetLayoutInfo.pBindings = bindings;
     EXIT_ON_VK_ERROR(vkCreateDescriptorSetLayout(vkResources.device, &descSetLayoutInfo, nullptr, setLayout));
 
@@ -694,16 +777,20 @@ void Renderer::CreateBasicGraphicsLayout(
     EXIT_ON_VK_ERROR(vkCreatePipelineLayout(vkResources.device, &layoutInfoGraphics, nullptr, pipelineLayout));
 }
 
-void Renderer::CreateBasicGraphicsPipelines(
+void Renderer::CreateBasicGraphicsVkPipeline(
     VkPipelineLayout pipelineLayout,
     VkPipeline* pipeline,
-    uint8_t lightCount)
+    uint8_t lightCount,
+    uint8_t textureCount)
 {
     ShaderOptions opts;
     string strLightCount = to_string(lightCount);
+    string strTextureCount = to_string(textureCount);
+
     opts.AddOption("LIGHT_COUNT", strLightCount.c_str());
-    VkShaderModule vertexShader = compiler.CompileShaderFromPath(vkResources.device, nullptr, "shaders/basic.vert", "main", shaderc_vertex_shader, {});
-    VkShaderModule fragmentShader = compiler.CompileShaderFromPath(vkResources.device, nullptr, "shaders/basic.frag", "main", shaderc_fragment_shader, {});
+    opts.AddOption("TEXTURE_COUNT", strTextureCount.c_str());
+    VkShaderModule vertexShader = compiler.CompileShaderFromPath(vkResources.device, nullptr, "shaders/basic.vert", "main", shaderc_vertex_shader, opts);
+    VkShaderModule fragmentShader = compiler.CompileShaderFromPath(vkResources.device, nullptr, "shaders/basic.frag", "main", shaderc_fragment_shader, opts);
 
 
     VkPipelineShaderStageCreateInfo shaderInfo[2] = {};

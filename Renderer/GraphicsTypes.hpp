@@ -4,6 +4,15 @@
 #include <vector>
 #include <DirectXMath.h>
 
+struct TextureDim
+{
+	TextureDim(uint16_t width, uint16_t height) : width(width), height(height) {}
+
+	uint16_t width;
+	uint16_t height;
+
+};
+
 struct VulkanPipelineData
 {
 	VkPipeline pipeline;
@@ -15,6 +24,9 @@ struct VulkanPipelineData
 	size_t boundGlobalUboId;
 	uint32_t maxSets;
 	uint8_t lightCount;
+	std::vector<TextureDim> texDims;
+	std::vector<Texture> textures;
+	VkSampler sampler;
 };
 
 struct Light

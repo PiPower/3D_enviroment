@@ -24,8 +24,9 @@ public:
 	void BeginRendering();
 
 	int64_t CreateGraphicsPipeline(
-		uint8_t lightCount, 
-		uint64_t* pipelineId);
+		uint8_t lightCount,
+		const std::vector<TextureDim>& textureDims,
+		uint64_t* pipeline);
 
 	/*
 		maximum number of render items per mesh collection is 0xFFFFFFFFFFFF
@@ -64,7 +65,7 @@ public:
 		Each mesh retains index from geometryEntries
 		On error returns 0xFFFFFFFFFFFFFFFF
 	*/
-	int64_t  CreateMeshCollection(
+	int64_t CreateMeshCollection(
 		const std::vector<GeometryEntry>& geometryEntries,
 		uint64_t* createdMeshId);
 
@@ -80,18 +81,26 @@ private:
 		VkPipelineLayout* pipelineLayout);
 
 	void CreateBasicGraphicsLayout(
+		uint8_t textureCount,
 		VkDescriptorSetLayout* setLayout,
 		VkPipelineLayout* pipelineLayout);
 
-	void CreateBasicGraphicsPipelines(
+	void CreateBasicGraphicsVkPipeline(
 		VkPipelineLayout pipelineLayout,
 		VkPipeline* pipeline,
-		uint8_t lightCount);
+		uint8_t lightCount,
+		uint8_t textureCount);
 
 	void CreateGraphicsSets(
 		VulkanPipelineData* pipelineData);
 
 	void InitComputeSets(
+		VulkanPipelineData* pipelineData);
+
+	void SetImageSets(
+		VulkanPipelineData* pipelineData);
+
+	void CreateSampler(
 		VulkanPipelineData* pipelineData);
 private:
 	uint32_t imageIndex;

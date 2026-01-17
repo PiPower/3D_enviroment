@@ -113,6 +113,14 @@ VkResult performBufferCopy(
 	VkDeviceSize srcOffset = 0,
 	VkDeviceSize dstOffset = 0);
 
+Texture createTexture2D(
+	VkDevice device,
+	VkPhysicalDevice physicalDevice,
+	uint32_t width,
+	uint32_t height,
+	VkFormat format,
+	VkImageUsageFlags usage);
+
 VkResult allocateMemoryPool(
 	VkDevice device,
 	VkPhysicalDevice physicalDevice,

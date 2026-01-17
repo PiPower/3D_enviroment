@@ -3,6 +3,10 @@
     #define LIGHT_COUNT
 #endif
 
+#ifndef TEXTURE_COUNT
+    #define TEXTURE_COUNT
+#endif
+
 #define GAMMA_F 2.2f
 
 struct Light
@@ -25,6 +29,8 @@ layout(binding = 1) uniform  ObjectTransform
     vec4 color;
 } objectTransform;
 
+layout(binding = 2) uniform sampler2D smp[TEXTURE_COUNT];
+
 layout(location = 0) in vec3 faceNormal;
 layout(location = 1) in vec2 texCoord; 
 layout(location = 2) in vec4 worldPos;
@@ -33,12 +39,13 @@ layout(location = 2) in vec4 worldPos;
 layout(location = 0) out vec4 outColor;
 void main()
 {
+    vec4 color = texture(smp[0], texCoord);
+
     vec3 lightVec = normalize(global.lights[0].pos.xyz - worldPos.xyz);
     float diffCoeff = max(dot(normalize(faceNormal), lightVec), 0.0);
     vec3 diffuseLight = diffCoeff * global.lights[0].color.rgb;
     vec3 ambientLight = global.lights[0].pos.w * global.lights[0].color.rgb;
 
-    outColor = objectTransform.color;
-    outColor.rgb = (diffuseLight + ambientLight) * outColor.rgb;
-    outColor.rgb = pow(outColor.rgb, vec3(1.0/GAMMA_F));
+    outColor.rgb = (diffuseLight + ambientLight) * color.rgb;
+    outColor.rgb = pow(color.rgb, vec3(1.0/GAMMA_F));
 }
