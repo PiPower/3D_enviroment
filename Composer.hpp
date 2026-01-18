@@ -38,6 +38,9 @@ struct Composer
 		uint64_t bodyId, 
 		uint8_t faceId);
 
+	void UpdateTextures(
+		const std::vector<TextureDim>& dims);
+
 	bool CheckIfObjIsOnWalkableCuboidSurface(
 		const DirectX::XMFLOAT3& ptOnCuboid,
 		size_t cuboidIdx);

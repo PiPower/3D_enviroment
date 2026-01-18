@@ -53,10 +53,7 @@ Composer::Composer(
     memcpy(globalUboBuffer + sizeof(XMFLOAT4X4), &proj, sizeof(XMFLOAT4X4));
 
     GenerateObjects();
-
-    Texel texData[300 * 300];
-    memset(texData, 255, sizeof(Texel) * 300 * 300);
-    renderer->UploadTexture(pipelineId, 0, (char*)texData);
+    UpdateTextures(dims);
 }
 
 void Composer::RenderScene()
@@ -73,6 +70,29 @@ void Composer::AddWalkableCuboid(
     uint8_t faceId)
 {
     walkableCuboids.push_back({ bodyId, faceId });
+}
+
+void Composer::UpdateTextures(
+    const std::vector<TextureDim>& dims)
+{
+    Texel* texData = new Texel[300 * 300];
+
+    Texel sourceTexels[6] = { {255, 255, 255, 255},
+                              {12, 56, 230, 255},
+                              {120, 120, 50, 255},
+                              {2, 150, 2, 255},
+                              {120, 5, 5, 255},
+                              {40, 40, 40, 255} };
+
+    for (int i = 0; i < 6; i++)
+    {
+        for (int j = 0; j < dims[i].height * dims[i].width; j++)
+        {
+            texData[j] = sourceTexels[i];
+        }
+        renderer->UploadTexture(pipelineId, i, (char*)texData);
+    }
+    delete[] texData;
 }
 
 bool Composer::CheckIfObjIsOnWalkableCuboidSurface(
@@ -135,7 +155,7 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 0.5f;
         bodyProps.friction = 1.0f;
         XMFLOAT3 scales = { 1.0f, 1.0f, 1.0f };
-        XMUINT4 objInfo = { 0, 0, 0 ,0 };
+        XMUINT4 objInfo = { 1, 0, 0 ,0 };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
         AddBody(ShapeType::OrientedBox, bodyProps, scales, objInfo, bounds, true);
     }
@@ -151,7 +171,7 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 1.0f;
         bodyProps.friction = 0.01f;
         XMFLOAT3 scales = { 35, 1, 35 };
-        XMUINT4 objInfo = { 0, 0, 0 ,0 };
+        XMUINT4 objInfo = { 2, 0, 0 ,0 };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
         AddBody(ShapeType::OrientedBox, bodyProps, scales, objInfo, bounds, true);
         AddWalkableCuboid(physicsEntities.back(), w_top);
@@ -167,7 +187,7 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 1.0f;
         bodyProps.friction = 0.01f;
         XMFLOAT3 scales = { 1, 20, 35 };
-        XMUINT4 objInfo = { 0, 0, 0 ,0 };
+        XMUINT4 objInfo = { 3, 0, 0 ,0 };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
         AddBody(ShapeType::OrientedBox, bodyProps, scales, objInfo, bounds, true);
     }
@@ -183,7 +203,7 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 1.0f;
         bodyProps.friction = 0.01f;
         XMFLOAT3 scales = { 1, 20, 35 };
-        XMUINT4 objInfo = { 0, 0, 0 ,0 };
+        XMUINT4 objInfo = { 3, 0, 0 ,0 };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
         AddBody(ShapeType::OrientedBox, bodyProps, scales, objInfo, bounds, true);
     }
@@ -199,7 +219,7 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 1.0f;
         bodyProps.friction = 0.01f;
         XMFLOAT3 scales = { 35, 20, 1 };
-        XMUINT4 objInfo = { 0, 0, 0 ,0 };
+        XMUINT4 objInfo = { 3, 0, 0 ,0 };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
         AddBody(ShapeType::OrientedBox, bodyProps, scales, objInfo, bounds, true);
     }
@@ -215,7 +235,7 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 1.0f;
         bodyProps.friction = 0.01f;
         XMFLOAT3 scales = { 35, 20, 1 };
-        XMUINT4 objInfo = { 0, 0, 0 ,0 };
+        XMUINT4 objInfo = { 3, 0, 0 ,0 };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
         AddBody(ShapeType::OrientedBox, bodyProps, scales, objInfo, bounds, true);
     }
@@ -233,7 +253,7 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 0.0f;
         bodyProps.friction = 0.01f;
         XMFLOAT3 scales = { 5, 1, 1 };
-        XMUINT4 objInfo = { 0, 0, 0 ,0 };
+        XMUINT4 objInfo = { 4, 0, 0 ,0 };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
         AddBody(ShapeType::OrientedBox, bodyProps, scales, objInfo, bounds, true);
         AddWalkableCuboid(physicsEntities.back(), w_top);
@@ -250,7 +270,7 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 1.0f;
         bodyProps.friction = 0.01f;
         XMFLOAT3 scales = { 5, 1, 5 };
-        XMUINT4 objInfo = { 0, 0, 0 ,0 };
+        XMUINT4 objInfo = { 5, 0, 0 ,0 };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
         AddBody(ShapeType::OrientedBox, bodyProps, scales, objInfo, bounds, true);
         AddWalkableCuboid(physicsEntities.back(), w_top);
