@@ -113,6 +113,7 @@ VkResult performBufferCopy(
 	VkDeviceSize srcOffset = 0,
 	VkDeviceSize dstOffset = 0);
 
+
 Texture createTexture2D(
 	VkDevice device,
 	VkPhysicalDevice physicalDevice,

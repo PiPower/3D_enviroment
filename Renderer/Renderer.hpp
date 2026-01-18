@@ -21,12 +21,15 @@ public:
 		HWND hwnd,
 		VkDeviceSize stagingSize = 1'000'000);
 
-	void BeginRendering();
-
 	int64_t CreateGraphicsPipeline(
 		uint8_t lightCount,
 		const std::vector<TextureDim>& textureDims,
 		uint64_t* pipeline);
+
+	int64_t UploadTexture(
+		uint64_t pipelineId,
+		uint8_t textureId,
+		const char* data);
 
 	/*
 		maximum number of render items per mesh collection is 0xFFFFFFFFFFFF
@@ -53,6 +56,7 @@ public:
 		uint64_t uboPoolId,
 		uint64_t globalUboId);
 
+	void BeginRendering();
 
 	void Render(
 		uint64_t meshCollectionId,

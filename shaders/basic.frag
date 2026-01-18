@@ -39,13 +39,13 @@ layout(location = 2) in vec4 worldPos;
 layout(location = 0) out vec4 outColor;
 void main()
 {
-    vec4 color = texture(smp[0], texCoord);
-
+ 
     vec3 lightVec = normalize(global.lights[0].pos.xyz - worldPos.xyz);
     float diffCoeff = max(dot(normalize(faceNormal), lightVec), 0.0);
     vec3 diffuseLight = diffCoeff * global.lights[0].color.rgb;
     vec3 ambientLight = global.lights[0].pos.w * global.lights[0].color.rgb;
 
-    outColor.rgb = (diffuseLight + ambientLight) * color.rgb;
-    outColor.rgb = pow(color.rgb, vec3(1.0/GAMMA_F));
+    outColor = texture(smp[0], vec2(0, 0));
+    outColor.rgb = (diffuseLight + ambientLight) * outColor.rgb;
+    outColor.rgb = pow(outColor.rgb, vec3(1.0/GAMMA_F));
 }

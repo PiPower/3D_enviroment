@@ -9,6 +9,11 @@ static constexpr XMFLOAT3 eyeInitial = { -10.0f, 9.0f, -25.0f };
 static constexpr XMFLOAT3 lookDirInitial = { 0.0f, 0.0f, 1.0f };
 static constexpr XMFLOAT3 upInitial = { 0.0f, 1.0f, 0.0f };
 
+struct Texel
+{
+    char r, g, b, a;
+};
+
 struct PointProjection
 {
     float dist;
@@ -24,11 +29,11 @@ Composer::Composer(
     :
     cameraAngleX(0), cameraAngleY(0), camOrientation(eyeInitial, upInitial, lookDirInitial),
     renderer(renderer), physicsEngine(physicsEngine), calculatePhysics(true), frameMode(true),
-    lights(lights), characterVelocity({ 0, 0, 0 }), constForce(gravityForce), dragCoeff({ 0.98f, 1.0f,  0.98f }),
+    characterVelocity({ 0, 0, 0 }), constForce(gravityForce), dragCoeff({ 0.98f, 1.0f,  0.98f }),
     orientationDir({ 1, 0, 0 }), forwardDir({ 1, 0, 0 }), upDir({ 0,1,0 }), rightDir({ 0,0,-1 }),
     characterVelocityCoeff({ 70000, 70000, 70000 }), freeFall(true), scalesVel({1.0f, 1.0f, 1.0f})
 {
-    vector<Light> lights = { Light{{1, 1, 1, 1.0f}, {0.0f, 100.0f, 0.0f, 0.2f} } };
+    lights = { Light{{1, 1, 1, 1.0f}, {0.0f, 100.0f, 0.0f, 0.2f} } };
     vector<TextureDim> dims(10, TextureDim{ 300, 300});
     renderer->CreateGraphicsPipeline(lights.size(), dims ,&pipelineId);
 
@@ -48,6 +53,10 @@ Composer::Composer(
     memcpy(globalUboBuffer + sizeof(XMFLOAT4X4), &proj, sizeof(XMFLOAT4X4));
 
     GenerateObjects();
+
+    Texel texData[300 * 300];
+    memset(texData, 255, sizeof(Texel) * 300 * 300);
+    renderer->UploadTexture(pipelineId, 0, (char*)texData);
 }
 
 void Composer::RenderScene()

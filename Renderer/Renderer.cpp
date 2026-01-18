@@ -112,6 +112,84 @@ int64_t Renderer::CreateGraphicsPipeline(
     return 0;
 }
 
+int64_t Renderer::UploadTexture(
+    uint64_t pipelineId, 
+    uint8_t textureId,
+    const char* data)
+{
+    constexpr int texelByteSize = 4;
+    VulkanPipelineData* pipelineData = &pipelines[pipelineId];
+    memcpy(stagingPtr, data, pipelineData->texDims[textureId].width * pipelineData->texDims[textureId].height * texelByteSize);
+
+    VkImageMemoryBarrier barriers[2] = {};
+    barriers[0] = {};
+    barriers[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barriers[0].srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+    barriers[0].dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+    barriers[0].oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barriers[0].newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    barriers[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barriers[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barriers[0].image = pipelineData->textures[textureId].texImage;
+    barriers[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barriers[0].subresourceRange.baseMipLevel = 0;
+    barriers[0].subresourceRange.levelCount = 1;
+    barriers[0].subresourceRange.baseArrayLayer = 0;
+    barriers[0].subresourceRange.layerCount = 1;
+
+    barriers[1] = {};
+    barriers[1].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barriers[1].srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+    barriers[1].dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+    barriers[1].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    barriers[1].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barriers[1].image = pipelineData->textures[textureId].texImage;
+    barriers[1].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barriers[1].subresourceRange.baseMipLevel = 0;
+    barriers[1].subresourceRange.levelCount = 1;
+    barriers[1].subresourceRange.baseArrayLayer = 0;
+    barriers[1].subresourceRange.layerCount = 1;
+
+    VkBufferImageCopy copyRegion = {};
+    copyRegion.bufferOffset = 0;
+    copyRegion.bufferRowLength = 0;
+    copyRegion.bufferImageHeight = 0;
+    copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    copyRegion.imageSubresource.mipLevel = 0;
+    copyRegion.imageSubresource.baseArrayLayer = 0;
+    copyRegion.imageSubresource.layerCount = 1;
+    copyRegion.imageOffset = { 0, 0, 0 };
+    copyRegion.imageExtent = { pipelineData->texDims[textureId].width,
+                               pipelineData->texDims[textureId].height, 1 };
+    // transition all required resources 
+    VkCommandBufferBeginInfo cmdBuffInfo = {};
+    cmdBuffInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    cmdBuffInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    EXIT_ON_VK_ERROR(vkResetCommandBuffer(vkResources.sideCmdBuffer, 0));
+    EXIT_ON_VK_ERROR(vkBeginCommandBuffer(vkResources.sideCmdBuffer, &cmdBuffInfo));
+
+    vkCmdPipelineBarrier(vkResources.sideCmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+             VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, barriers);
+
+    vkCmdCopyBufferToImage(vkResources.sideCmdBuffer, stagingBuffer.buffer, pipelineData->textures[textureId].texImage,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
+
+    vkCmdPipelineBarrier(vkResources.sideCmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+        VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, barriers + 1);
+
+    EXIT_ON_VK_ERROR(vkEndCommandBuffer(vkResources.sideCmdBuffer));
+    VkSubmitInfo submitInfo = {};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &vkResources.sideCmdBuffer;
+    EXIT_ON_VK_ERROR(vkQueueSubmit(vkResources.sideQueue, 1, &submitInfo, nullptr));
+    EXIT_ON_VK_ERROR(vkQueueWaitIdle(vkResources.sideQueue));
+
+    return 0;
+}
+
 int64_t Renderer::UpdateUboMemory(
     uint64_t poolId,
     uint64_t uboId,
@@ -708,7 +786,8 @@ void Renderer::PrepareTextureData(
     for (size_t i = 0; i < pipelineData->texDims.size(); i++)
     {
         Texture tex = createTexture2D(vkResources.device, vkResources.physicalDevice,
-            pipelineData->texDims[i].width, pipelineData->texDims[i].height, SURFACE_FORMAT, VK_IMAGE_USAGE_SAMPLED_BIT);
+            pipelineData->texDims[i].width, pipelineData->texDims[i].height, SURFACE_FORMAT,
+            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
         pipelineData->textures.push_back(std::move(tex));
     }
 
@@ -717,8 +796,8 @@ void Renderer::PrepareTextureData(
     {
         barriers[i] = {};
         barriers[i].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barriers[i].srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
-        barriers[i].dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+        barriers[i].srcAccessMask = 0;
+        barriers[i].dstAccessMask = 0;
         barriers[i].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         barriers[i].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         barriers[i].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
