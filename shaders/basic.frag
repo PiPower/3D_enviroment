@@ -26,7 +26,7 @@ layout(binding = 0) uniform Globals
 layout(binding = 1) uniform  ObjectTransform
 {
     mat4 model;
-    vec4 color;
+    uvec4 objInfo; //(x - textureIdx, y - unused, z - unused, w - unused)
 } objectTransform;
 
 layout(binding = 2) uniform sampler2D smp[TEXTURE_COUNT];
@@ -45,7 +45,7 @@ void main()
     vec3 diffuseLight = diffCoeff * global.lights[0].color.rgb;
     vec3 ambientLight = global.lights[0].pos.w * global.lights[0].color.rgb;
 
-    outColor = texture(smp[0], vec2(0, 0));
+    outColor = texture(smp[objectTransform.objInfo.x], texCoord);
     outColor.rgb = (diffuseLight + ambientLight) * outColor.rgb;
     outColor.rgb = pow(outColor.rgb, vec3(1.0/GAMMA_F));
 }

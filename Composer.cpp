@@ -118,9 +118,9 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 0.0f;
         bodyProps.friction = 0.0f;
         XMFLOAT3 scales = { 0.5f, 0.5f, 0.5f};
-        XMFLOAT4 color = { 1.0f,  1.0f,  1.0f, 1.0f };
+        XMUINT4 objInfo = {0, 0, 0 ,0 };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
-        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, bounds, false, { 0, 0, 0 });
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, objInfo, bounds, false, { 0, 0, 0 });
         characterId = physicsEntities.back();
     }
     
@@ -135,9 +135,9 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 0.5f;
         bodyProps.friction = 1.0f;
         XMFLOAT3 scales = { 1.0f, 1.0f, 1.0f };
-        XMFLOAT4 color = { 1.0f,  1.0f,  1.0f, 1.0f };
+        XMUINT4 objInfo = { 0, 0, 0 ,0 };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
-        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, bounds, true);
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, objInfo, bounds, true);
     }
 
     // floor
@@ -151,9 +151,9 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 1.0f;
         bodyProps.friction = 0.01f;
         XMFLOAT3 scales = { 35, 1, 35 };
-        XMFLOAT4 color = { 0.2f, 0.5f, 0.1f, 1.0f };
+        XMUINT4 objInfo = { 0, 0, 0 ,0 };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
-        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, bounds, true);
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, objInfo, bounds, true);
         AddWalkableCuboid(physicsEntities.back(), w_top);
     }
     // left wall
@@ -167,9 +167,9 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 1.0f;
         bodyProps.friction = 0.01f;
         XMFLOAT3 scales = { 1, 20, 35 };
-        XMFLOAT4 color = { 0.5f, 0.1f, 0.1f, 1.0f };
+        XMUINT4 objInfo = { 0, 0, 0 ,0 };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
-        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, bounds, true);
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, objInfo, bounds, true);
     }
 
     // right wall
@@ -183,9 +183,9 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 1.0f;
         bodyProps.friction = 0.01f;
         XMFLOAT3 scales = { 1, 20, 35 };
-        XMFLOAT4 color = { 0.5f, 0.1f, 0.1f, 1.0f };
+        XMUINT4 objInfo = { 0, 0, 0 ,0 };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
-        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, bounds, true);
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, objInfo, bounds, true);
     }
 
     // front wall
@@ -199,9 +199,9 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 1.0f;
         bodyProps.friction = 0.01f;
         XMFLOAT3 scales = { 35, 20, 1 };
-        XMFLOAT4 color = { 0.5f, 0.1f, 0.1f, 1.0f };
+        XMUINT4 objInfo = { 0, 0, 0 ,0 };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
-        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, bounds, true);
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, objInfo, bounds, true);
     }
 
     // back wall
@@ -215,9 +215,9 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 1.0f;
         bodyProps.friction = 0.01f;
         XMFLOAT3 scales = { 35, 20, 1 };
-        XMFLOAT4 color = { 0.5f, 0.1f, 0.1f, 1.0f };
+        XMUINT4 objInfo = { 0, 0, 0 ,0 };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
-        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, bounds, true);
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, objInfo, bounds, true);
     }
 
 
@@ -233,9 +233,9 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 0.0f;
         bodyProps.friction = 0.01f;
         XMFLOAT3 scales = { 5, 1, 1 };
-        XMFLOAT4 color = { 0.5f, 0.1f, 0.1f, 1.0f };
+        XMUINT4 objInfo = { 0, 0, 0 ,0 };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
-        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, bounds, true);
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, objInfo, bounds, true);
         AddWalkableCuboid(physicsEntities.back(), w_top);
     }
 
@@ -250,9 +250,9 @@ void Composer::GenerateObjects()
         bodyProps.elasticity = 1.0f;
         bodyProps.friction = 0.01f;
         XMFLOAT3 scales = { 5, 1, 5 };
-        XMFLOAT4 color = { 0.6f, 0.6f, 0.1f, 1.0f };
+        XMUINT4 objInfo = { 0, 0, 0 ,0 };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
-        AddBody(ShapeType::OrientedBox, bodyProps, scales, color, bounds, true);
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, objInfo, bounds, true);
         AddWalkableCuboid(physicsEntities.back(), w_top);
     }
 
@@ -401,7 +401,7 @@ void Composer::AddBody(
     const ShapeType& type,
     const BodyProperties& props,
     const DirectX::XMFLOAT3& scales,
-    const DirectX::XMFLOAT4& color,
+    const DirectX::XMUINT4& objInfo,
     const LinearVelocityBounds& vBounds,
     bool allowAngularImpulse,
     const DirectX::XMFLOAT3& constForce)
@@ -418,10 +418,10 @@ void Composer::AddBody(
     physicsEngine->AddBody(props, type, scales, isDynamic, &physicsEntities[entitySize], allowAngularImpulse, vBounds, constForce);
     physicsEngine->GetTransformMatrixForBody(physicsEntities[entitySize], &physicsEntitiesTrsfm[entitySize].transform);
 
-    physicsEntitiesTrsfm[entitySize].color[0] = color.x;
-    physicsEntitiesTrsfm[entitySize].color[1] = color.y;
-    physicsEntitiesTrsfm[entitySize].color[2] = color.z;
-    physicsEntitiesTrsfm[entitySize].color[3] = color.w;
+    physicsEntitiesTrsfm[entitySize].objInfo[0] = objInfo.x;
+    physicsEntitiesTrsfm[entitySize].objInfo[1] = objInfo.y;
+    physicsEntitiesTrsfm[entitySize].objInfo[2] = objInfo.z;
+    physicsEntitiesTrsfm[entitySize].objInfo[3] = objInfo.w;
 
 }
 

@@ -56,7 +56,7 @@ struct Composer
 	void AddBody( const ShapeType& type, 
 		const BodyProperties& props,
 		const DirectX::XMFLOAT3& scales, 
-		const DirectX::XMFLOAT4& color,
+		const DirectX::XMUINT4& objInfo,
 		const LinearVelocityBounds& vBounds,
 		bool allowAngularImpulse,
 		const DirectX::XMFLOAT3& constForce = { 0, -15, 0 });
