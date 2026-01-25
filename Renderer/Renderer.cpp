@@ -91,6 +91,14 @@ void Renderer::BeginRendering()
     vkCmdSetScissor(vkResources.cmdBuffer, 0, 1, &scissor);
 }
 
+void Renderer::UpdateSkyboxFaces(
+    const char** facePtrArray,
+    uint64_t uboPoolId,
+    uint64_t globalUboId)
+{
+    
+}
+
 int64_t Renderer::CreateGraphicsPipeline(
     uint8_t lightCount,
     const std::vector<TextureDim>& textureDims,
@@ -387,6 +395,15 @@ void Renderer::Render(
 
 void Renderer::Present()
 {
+
+    if (skyboxPipeline)
+    {
+        vkCmdBindPipeline(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, skyboxPipeline->pipeline);
+        uint32_t setDynamicRange[1] = { 0 };
+        vkCmdBindDescriptorSets(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+            skyboxPipeline->pipelineLayout, 0, 1, skyboxPipeline->sets.data(), 1, setDynamicRange);
+        vkCmdDraw(vkResources.cmdBuffer, 36, 1, 0, 0);
+    }
     vkCmdEndRenderPass(vkResources.cmdBuffer);
 
     vkCmdPipelineBarrier(vkResources.cmdBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -843,6 +860,7 @@ void Renderer::CreateSkyboxPipeline(
                     skyboxDim->width, skyboxDim->height, SURFACE_FORMAT,
                     VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, true);
     skyboxPipeline->textures.push_back(std::move(tex));
+    CreateSampler(skyboxPipeline);
     /*
     
         Create layouts
@@ -903,6 +921,24 @@ void Renderer::CreateSkyboxPipeline(
     allocInfo.pSetLayouts = layouts.data();
 
     EXIT_ON_VK_ERROR(vkAllocateDescriptorSets(vkResources.device, &allocInfo, skyboxPipeline->sets.data()));
+
+    VkDescriptorImageInfo texInfo = {};
+    texInfo.imageView = skyboxPipeline->textures[0].texView;
+    texInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    texInfo.sampler = skyboxPipeline->sampler;
+
+    VkWriteDescriptorSet skyboxUpdates = {};
+    skyboxUpdates = {};
+    skyboxUpdates.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    skyboxUpdates.dstSet = skyboxPipeline->sets[0];
+    skyboxUpdates.dstBinding = 1;
+    skyboxUpdates.dstArrayElement = 0;
+    skyboxUpdates.descriptorCount = 1;
+    skyboxUpdates.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    skyboxUpdates.pImageInfo = &texInfo;
+
+    vkUpdateDescriptorSets(vkResources.device, 1, &skyboxUpdates, 0, nullptr);
+
     /*
 
         Create pipeline

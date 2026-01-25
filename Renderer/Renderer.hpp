@@ -59,6 +59,11 @@ public:
 
 	void BeginRendering();
 
+	void UpdateSkyboxFaces(
+		const char** facePtrArray,
+		uint64_t uboPoolId,
+		uint64_t globalUboId);
+
 	void Render(
 		uint64_t meshCollectionId,
 		uint64_t pipelineId,
