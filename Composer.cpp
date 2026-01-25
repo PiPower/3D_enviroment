@@ -42,6 +42,7 @@ Composer::Composer(
     renderer->CreateUboPool(sizeof(Camera) + lights.size() * sizeof(Light), sizeof(ObjectUbo), 300'000, &uboPool);
     renderer->AllocateUboResource(uboPool, UBO_GLOBAL_RESOURCE_TYPE, &globalUbo);
     renderer->BindUboPoolToPipeline(pipelineId, uboPool, globalUbo);
+    renderer->UpdateSkyboxData(nullptr, uboPool, globalUbo);
 
     globalUboBuffer = new char[sizeof(Camera) + lights.size() * sizeof(Light)];
     memcpy(globalUboBuffer + sizeof(Camera), lights.data(), lights.size() * sizeof(Light));

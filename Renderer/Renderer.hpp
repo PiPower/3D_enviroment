@@ -59,7 +59,7 @@ public:
 
 	void BeginRendering();
 
-	void UpdateSkyboxFaces(
+	int64_t UpdateSkyboxData(
 		const char** facePtrArray,
 		uint64_t uboPoolId,
 		uint64_t globalUboId);

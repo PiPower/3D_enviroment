@@ -91,12 +91,42 @@ void Renderer::BeginRendering()
     vkCmdSetScissor(vkResources.cmdBuffer, 0, 1, &scissor);
 }
 
-void Renderer::UpdateSkyboxFaces(
+int64_t Renderer::UpdateSkyboxData(
     const char** facePtrArray,
     uint64_t uboPoolId,
     uint64_t globalUboId)
 {
+    if (uboPoolId > uboPoolEntries.size())
+    {
+        return -2;
+    }
+
+
+    UboPoolEntry* uboPoolEntry = &uboPoolEntries[uboPoolId - 1];
+    UboEntry* camUbo = &uboPoolEntry->uboEntries[globalUboId - 1];
+
+    skyboxPipeline->boundPoolId = uboPoolId;
+    skyboxPipeline->boundGlobalUboId = globalUboId;
+
+    VkWriteDescriptorSet updatSkybox = {};
+    VkDescriptorBufferInfo buffInfo = {};
+
+    buffInfo.buffer = uboPoolEntry->uboPool.boundBuffers[camUbo->bufferIdx];
+    buffInfo.offset = 0;
+    buffInfo.range = uboPoolEntry->uboPool.bufferInfos[GFX_CAMERA_UBO].size;
+
+    updatSkybox.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    updatSkybox.dstSet = skyboxPipeline->sets[0];
+    updatSkybox.dstBinding = 0;
+    updatSkybox.dstArrayElement = 0;
+    updatSkybox.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    updatSkybox.descriptorCount = 1;
+    updatSkybox.pBufferInfo = &buffInfo;
+
+
+    vkUpdateDescriptorSets(vkResources.device, 1, &updatSkybox, 0, nullptr);
     
+    return 0;
 }
 
 int64_t Renderer::CreateGraphicsPipeline(
@@ -398,10 +428,13 @@ void Renderer::Present()
 
     if (skyboxPipeline)
     {
+        UboPoolEntry* uboPool = &uboPoolEntries[skyboxPipeline->boundPoolId - 1];
+        uint32_t setDynamicRange = uboPool->uboEntries[skyboxPipeline->boundGlobalUboId - 1].bufferOffset;
+
+
         vkCmdBindPipeline(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, skyboxPipeline->pipeline);
-        uint32_t setDynamicRange[1] = { 0 };
         vkCmdBindDescriptorSets(vkResources.cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-            skyboxPipeline->pipelineLayout, 0, 1, skyboxPipeline->sets.data(), 1, setDynamicRange);
+            skyboxPipeline->pipelineLayout, 0, 1, skyboxPipeline->sets.data(), 1, &setDynamicRange);
         vkCmdDraw(vkResources.cmdBuffer, 36, 1, 0, 0);
     }
     vkCmdEndRenderPass(vkResources.cmdBuffer);
