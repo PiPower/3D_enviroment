@@ -19,6 +19,7 @@ public:
 	Renderer(
 		HINSTANCE hinstance, 
 		HWND hwnd,
+		TextureDim* skyboxDim,
 		VkDeviceSize stagingSize = 1'000'000);
 
 	int64_t CreateGraphicsPipeline(
@@ -110,6 +111,9 @@ private:
 	void PrepareTextureData(
 		VulkanPipelineData* pipelineData);
 
+	void CreateSkyboxPipeline(
+		TextureDim* skyboxDim);
+
 private:
 	uint32_t imageIndex;
 	VkDeviceSize maxUboPoolSize;
@@ -119,6 +123,7 @@ private:
 	ShaderCompiler compiler;
 	VkImageCopy computeSwapchainCopy;
 	AllocatedBuffer stagingBuffer;
+	VulkanPipelineData* skyboxPipeline;
 	char* stagingPtr;
 	std::vector<VkRenderPassBeginInfo> renderPassInfos;
 	std::vector<VkImageMemoryBarrier> transferBarriers;

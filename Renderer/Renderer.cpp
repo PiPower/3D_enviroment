@@ -40,6 +40,7 @@ const Geometry* baseShapesTable[]
 Renderer::Renderer(
     HINSTANCE hinstance,
     HWND hwnd,
+    TextureDim* skyboxDim,
     VkDeviceSize stagingSize)
 	:
 	windowHwnd(hwnd), compiler(), pipelines(1), maxUboPoolSize(65536)
@@ -55,6 +56,10 @@ Renderer::Renderer(
     CreateComputeLayout(&pipeline->descriptorSetLayout, &pipeline->pipelineLayout);
     CreateComputePipeline(pipeline->pipelineLayout, &pipeline->pipeline);
     InitComputeSets(pipeline);
+    if (skyboxDim)
+    {
+        CreateSkyboxPipeline(skyboxDim);
+    }
 }
 
 void Renderer::BeginRendering()
@@ -826,6 +831,200 @@ void Renderer::PrepareTextureData(
     submitInfo.pCommandBuffers = &vkResources.cmdBuffer;
     EXIT_ON_VK_ERROR(vkQueueSubmit(vkResources.graphicsQueue, 1, &submitInfo, nullptr));
     EXIT_ON_VK_ERROR(vkQueueWaitIdle(vkResources.graphicsQueue));
+
+}
+
+void Renderer::CreateSkyboxPipeline(
+    TextureDim* skyboxDim)
+{
+    skyboxPipeline = new VulkanPipelineData();
+    skyboxPipeline->texDims.push_back(*skyboxDim);
+    Texture tex = createTexture2D(vkResources.device, vkResources.physicalDevice,
+                    skyboxDim->width, skyboxDim->height, SURFACE_FORMAT,
+                    VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, true);
+    skyboxPipeline->textures.push_back(std::move(tex));
+    /*
+    
+        Create layouts
+        
+    */
+    VkDescriptorSetLayoutBinding bindings[2] = {};
+    bindings[0].binding = 0;
+    bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    bindings[0].descriptorCount = 1;
+    bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    bindings[0].pImmutableSamplers = nullptr;
+
+    bindings[1].binding = 1;
+    bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[1].descriptorCount = 1;
+    bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings[1].pImmutableSamplers = nullptr;
+
+    VkDescriptorSetLayoutCreateInfo descSetLayoutInfo = {};
+    descSetLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    descSetLayoutInfo.bindingCount = 2;
+    descSetLayoutInfo.pBindings = bindings;
+    EXIT_ON_VK_ERROR(vkCreateDescriptorSetLayout(vkResources.device, &descSetLayoutInfo, nullptr, &skyboxPipeline->descriptorSetLayout));
+
+    VkPipelineLayoutCreateInfo layoutInfoGraphics = {};
+    layoutInfoGraphics.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    layoutInfoGraphics.setLayoutCount = 1;
+    layoutInfoGraphics.pSetLayouts = &skyboxPipeline->descriptorSetLayout;
+    EXIT_ON_VK_ERROR(vkCreatePipelineLayout(vkResources.device, &layoutInfoGraphics, nullptr, &skyboxPipeline->pipelineLayout));
+
+
+    /*
+    
+        Cteate sets
+    
+    */
+
+    skyboxPipeline->maxSets = 1;
+    VkDescriptorPoolSize gfxPoolSize[2] = {};
+    gfxPoolSize[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    gfxPoolSize[0].descriptorCount = skyboxPipeline->maxSets;
+    gfxPoolSize[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    gfxPoolSize[1].descriptorCount = skyboxPipeline->maxSets;
+
+    VkDescriptorPoolCreateInfo gfxPoolDesc = {};
+    gfxPoolDesc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    gfxPoolDesc.maxSets = skyboxPipeline->maxSets;
+    gfxPoolDesc.poolSizeCount = 2;
+    gfxPoolDesc.pPoolSizes = gfxPoolSize;
+    EXIT_ON_VK_ERROR(vkCreateDescriptorPool(vkResources.device, &gfxPoolDesc, nullptr, &skyboxPipeline->descriptorPool));
+
+    skyboxPipeline->sets.resize(skyboxPipeline->maxSets);
+    vector<VkDescriptorSetLayout> layouts(skyboxPipeline->maxSets, skyboxPipeline->descriptorSetLayout);
+    VkDescriptorSetAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = skyboxPipeline->descriptorPool;
+    allocInfo.descriptorSetCount = layouts.size();
+    allocInfo.pSetLayouts = layouts.data();
+
+    EXIT_ON_VK_ERROR(vkAllocateDescriptorSets(vkResources.device, &allocInfo, skyboxPipeline->sets.data()));
+    /*
+
+        Create pipeline
+
+    */
+
+    ShaderOptions opts;
+    VkShaderModule vertexShader = compiler.CompileShaderFromPath(vkResources.device, nullptr, "shaders/Skybox.vert", "main", shaderc_vertex_shader, opts);
+    VkShaderModule fragmentShader = compiler.CompileShaderFromPath(vkResources.device, nullptr, "shaders/Skybox.frag", "main", shaderc_fragment_shader, opts);
+
+    VkPipelineShaderStageCreateInfo shaderInfo[2] = {};
+    shaderInfo[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shaderInfo[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+    shaderInfo[0].module = vertexShader;
+    shaderInfo[0].pName = "main";
+
+    shaderInfo[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shaderInfo[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    shaderInfo[1].module = fragmentShader;
+    shaderInfo[1].pName = "main";
+
+
+    VkPipelineVertexInputStateCreateInfo inputStateInfo = {};
+    inputStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    inputStateInfo.vertexBindingDescriptionCount = 0;
+    inputStateInfo.pVertexBindingDescriptions = nullptr;
+    inputStateInfo.vertexAttributeDescriptionCount = 0;
+    inputStateInfo.pVertexAttributeDescriptions = nullptr;
+
+    VkPipelineInputAssemblyStateCreateInfo inputAss = {};
+    inputAss.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAss.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAss.primitiveRestartEnable = VK_FALSE;
+
+    VkPipelineViewportStateCreateInfo vpInfo = {};
+    vpInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    vpInfo.viewportCount = 1;
+    vpInfo.scissorCount = 1;
+
+    VkPipelineRasterizationStateCreateInfo rasterInfo = {};
+    rasterInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterInfo.depthClampEnable = VK_FALSE;
+    rasterInfo.rasterizerDiscardEnable = VK_FALSE;
+    rasterInfo.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterInfo.cullMode = VK_CULL_MODE_BACK_BIT;
+    rasterInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterInfo.depthBiasEnable = VK_FALSE;
+    rasterInfo.depthBiasConstantFactor = 0.0f;
+    rasterInfo.depthBiasClamp = 0.0f;
+    rasterInfo.depthBiasSlopeFactor = 0.0f;
+    rasterInfo.lineWidth = 1.0f;
+
+    VkPipelineMultisampleStateCreateInfo multisampling{};
+    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampling.sampleShadingEnable = VK_FALSE;
+    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisampling.minSampleShading = 1.0f;
+    multisampling.pSampleMask = nullptr;
+    multisampling.alphaToCoverageEnable = VK_FALSE;
+    multisampling.alphaToOneEnable = VK_FALSE;
+
+
+    VkPipelineColorBlendAttachmentState colorBlendAttachment{};
+    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAttachment.blendEnable = VK_TRUE;
+    colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA; // Optional
+    colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA; // Optional
+    colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD; // Optional
+    colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA; // Optional
+    colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA; // Optional
+    colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD; // Optional
+
+    VkPipelineColorBlendStateCreateInfo blendInfo = {};
+    blendInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    blendInfo.logicOpEnable = VK_FALSE;
+    blendInfo.logicOp = VK_LOGIC_OP_COPY;
+    blendInfo.attachmentCount = 1;
+    blendInfo.pAttachments = &colorBlendAttachment;
+    blendInfo.blendConstants[0] = 0.0f;
+    blendInfo.blendConstants[1] = 0.0f;
+    blendInfo.blendConstants[2] = 0.0f;
+    blendInfo.blendConstants[3] = 0.0f;
+
+    VkDynamicState dynamicStates[2] = {
+                    VK_DYNAMIC_STATE_VIEWPORT,
+                    VK_DYNAMIC_STATE_SCISSOR };
+
+    VkPipelineDynamicStateCreateInfo dynamicState{};
+    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicState.dynamicStateCount = 2;
+    dynamicState.pDynamicStates = dynamicStates;
+
+    VkPipelineDepthStencilStateCreateInfo depthInfo = {};
+    depthInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthInfo.depthTestEnable = VK_TRUE;
+    depthInfo.depthWriteEnable = VK_TRUE;
+    depthInfo.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthInfo.depthBoundsTestEnable = VK_FALSE;
+    depthInfo.stencilTestEnable = VK_FALSE;
+
+    VkGraphicsPipelineCreateInfo pipelineInfo = {};
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.stageCount = 2;
+    pipelineInfo.pStages = shaderInfo;
+    pipelineInfo.pVertexInputState = &inputStateInfo;
+    pipelineInfo.pInputAssemblyState = &inputAss;
+    pipelineInfo.pViewportState = &vpInfo;
+    pipelineInfo.pRasterizationState = &rasterInfo;
+    pipelineInfo.pMultisampleState = &multisampling;
+    pipelineInfo.pDepthStencilState = &depthInfo;
+    pipelineInfo.pColorBlendState = &blendInfo;
+    pipelineInfo.pDynamicState = &dynamicState;
+    pipelineInfo.layout = skyboxPipeline->pipelineLayout;
+    pipelineInfo.renderPass = vkResources.renderPass;
+    pipelineInfo.subpass = 0;
+    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+    pipelineInfo.basePipelineIndex = -1;
+
+    EXIT_ON_VK_ERROR(vkCreateGraphicsPipelines(vkResources.device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &skyboxPipeline->pipeline));
+
+    vkDestroyShaderModule(vkResources.device, fragmentShader, nullptr);
+    vkDestroyShaderModule(vkResources.device, vertexShader, nullptr);
 
 }
 

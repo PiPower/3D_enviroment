@@ -120,7 +120,8 @@ Texture createTexture2D(
 	uint32_t width,
 	uint32_t height,
 	VkFormat format,
-	VkImageUsageFlags usage);
+	VkImageUsageFlags usage,
+	bool isCubemap = false);
 
 VkResult allocateMemoryPool(
 	VkDevice device,
