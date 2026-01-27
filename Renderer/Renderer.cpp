@@ -43,7 +43,7 @@ Renderer::Renderer(
     TextureDim* skyboxDim,
     VkDeviceSize stagingSize)
 	:
-	windowHwnd(hwnd), compiler(), pipelines(1), maxUboPoolSize(65536)
+	windowHwnd(hwnd), compiler(), pipelines(1), maxUboPoolSize(65536), skyboxPipelineId(0xFFFFFFFFFFFFFFFF)
 {
 	createVulkanResources(&vkResources, hinstance, windowHwnd);
 
@@ -92,40 +92,57 @@ void Renderer::BeginRendering()
 }
 
 int64_t Renderer::UpdateSkyboxData(
-    const char** facePtrArray,
+    const std::vector<const char*>& facePtrArray,
     uint64_t uboPoolId,
     uint64_t globalUboId)
 {
+    if (skyboxPipelineId != 0xFFFFFFFFFFFFFFFF)
+    {
+
+    }
     if (uboPoolId > uboPoolEntries.size())
     {
         return -2;
     }
 
+    if (facePtrArray.size() != 6)
+    {
+        return -4;
+    }
 
     UboPoolEntry* uboPoolEntry = &uboPoolEntries[uboPoolId - 1];
     UboEntry* camUbo = &uboPoolEntry->uboEntries[globalUboId - 1];
 
-    skyboxPipeline->boundPoolId = uboPoolId;
-    skyboxPipeline->boundGlobalUboId = globalUboId;
+     pipelines[skyboxPipelineId].boundPoolId = uboPoolId;
+     pipelines[skyboxPipelineId].boundGlobalUboId = globalUboId;
 
-    VkWriteDescriptorSet updatSkybox = {};
+    VkWriteDescriptorSet updateSkybox = {};
     VkDescriptorBufferInfo buffInfo = {};
 
     buffInfo.buffer = uboPoolEntry->uboPool.boundBuffers[camUbo->bufferIdx];
     buffInfo.offset = 0;
     buffInfo.range = uboPoolEntry->uboPool.bufferInfos[GFX_CAMERA_UBO].size;
 
-    updatSkybox.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    updatSkybox.dstSet = skyboxPipeline->sets[0];
-    updatSkybox.dstBinding = 0;
-    updatSkybox.dstArrayElement = 0;
-    updatSkybox.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-    updatSkybox.descriptorCount = 1;
-    updatSkybox.pBufferInfo = &buffInfo;
+    updateSkybox.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    updateSkybox.dstSet = pipelines[skyboxPipelineId].sets[0];
+    updateSkybox.dstBinding = 0;
+    updateSkybox.dstArrayElement = 0;
+    updateSkybox.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    updateSkybox.descriptorCount = 1;
+    updateSkybox.pBufferInfo = &buffInfo;
 
-
-    vkUpdateDescriptorSets(vkResources.device, 1, &updatSkybox, 0, nullptr);
+    vkUpdateDescriptorSets(vkResources.device, 1, &updateSkybox, 0, nullptr);
     
+
+
+    for (size_t idx = 0; idx < facePtrArray.size(); idx++)
+    {
+        if (facePtrArray[idx])
+        {
+            UploadTexture(skyboxPipelineId, 0, facePtrArray[idx], idx);
+        }
+    }
+
     return 0;
 }
 
@@ -149,7 +166,7 @@ int64_t Renderer::CreateGraphicsPipeline(
     CreateBasicGraphicsVkPipeline(pipeline->pipelineLayout, &pipeline->pipeline, lightCount, pipeline->texDims.size());
     CreateGraphicsSets(pipeline);
     CreateSampler(pipeline);
-    PrepareTextureData(pipeline);
+    PrepareTextureData(pipeline, pipeline->texDims);
     SetImageSets(pipeline);
     *pipelineId = pipelines.size() - 1;
     return 0;
@@ -158,7 +175,8 @@ int64_t Renderer::CreateGraphicsPipeline(
 int64_t Renderer::UploadTexture(
     uint64_t pipelineId, 
     uint8_t textureId,
-    const char* data)
+    const char* data,
+    uint32_t texInstanceIdx)
 {
     constexpr int texelByteSize = 4;
     VulkanPipelineData* pipelineData = &pipelines[pipelineId];
@@ -177,7 +195,7 @@ int64_t Renderer::UploadTexture(
     barriers[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     barriers[0].subresourceRange.baseMipLevel = 0;
     barriers[0].subresourceRange.levelCount = 1;
-    barriers[0].subresourceRange.baseArrayLayer = 0;
+    barriers[0].subresourceRange.baseArrayLayer = texInstanceIdx;
     barriers[0].subresourceRange.layerCount = 1;
 
     barriers[1] = {};
@@ -192,7 +210,7 @@ int64_t Renderer::UploadTexture(
     barriers[1].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     barriers[1].subresourceRange.baseMipLevel = 0;
     barriers[1].subresourceRange.levelCount = 1;
-    barriers[1].subresourceRange.baseArrayLayer = 0;
+    barriers[1].subresourceRange.baseArrayLayer = texInstanceIdx;
     barriers[1].subresourceRange.layerCount = 1;
 
     VkBufferImageCopy copyRegion = {};
@@ -426,8 +444,9 @@ void Renderer::Render(
 void Renderer::Present()
 {
 
-    if (skyboxPipeline)
+    if (skyboxPipelineId != 0xFFFFFFFFFFFFFFFF)
     {
+        VulkanPipelineData* skyboxPipeline = &pipelines[skyboxPipelineId];
         UboPoolEntry* uboPool = &uboPoolEntries[skyboxPipeline->boundPoolId - 1];
         uint32_t setDynamicRange = uboPool->uboEntries[skyboxPipeline->boundGlobalUboId - 1].bufferOffset;
 
@@ -836,13 +855,15 @@ void Renderer::CreateSampler(
 }
 
 void Renderer::PrepareTextureData(
-    VulkanPipelineData* pipelineData)
+    VulkanPipelineData* pipelineData,
+    const std::vector<TextureDim>& texDims,
+    bool isCubemap)
 {
     for (size_t i = 0; i < pipelineData->texDims.size(); i++)
     {
         Texture tex = createTexture2D(vkResources.device, vkResources.physicalDevice,
-            pipelineData->texDims[i].width, pipelineData->texDims[i].height, SURFACE_FORMAT,
-            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+            pipelineData->texDims[i].width, pipelineData->texDims[i].height, VK_FORMAT_R8G8B8A8_UNORM,
+            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, isCubemap);
         pipelineData->textures.push_back(std::move(tex));
     }
 
@@ -862,7 +883,7 @@ void Renderer::PrepareTextureData(
         barriers[i].subresourceRange.baseMipLevel = 0;
         barriers[i].subresourceRange.levelCount = 1;
         barriers[i].subresourceRange.baseArrayLayer = 0;
-        barriers[i].subresourceRange.layerCount = 1;
+        barriers[i].subresourceRange.layerCount = isCubemap ? 6 : 1;
     }
 
     VkCommandBufferBeginInfo cmdBuffInfo = {};
@@ -887,12 +908,11 @@ void Renderer::PrepareTextureData(
 void Renderer::CreateSkyboxPipeline(
     TextureDim* skyboxDim)
 {
-    skyboxPipeline = new VulkanPipelineData();
+    pipelines.push_back({});
+    skyboxPipelineId = pipelines.size() - 1;
+    VulkanPipelineData* skyboxPipeline = &pipelines[skyboxPipelineId];
     skyboxPipeline->texDims.push_back(*skyboxDim);
-    Texture tex = createTexture2D(vkResources.device, vkResources.physicalDevice,
-                    skyboxDim->width, skyboxDim->height, SURFACE_FORMAT,
-                    VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, true);
-    skyboxPipeline->textures.push_back(std::move(tex));
+    PrepareTextureData(skyboxPipeline, skyboxPipeline->texDims, true);
     CreateSampler(skyboxPipeline);
     /*
     

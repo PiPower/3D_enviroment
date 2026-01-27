@@ -42,7 +42,6 @@ Composer::Composer(
     renderer->CreateUboPool(sizeof(Camera) + lights.size() * sizeof(Light), sizeof(ObjectUbo), 300'000, &uboPool);
     renderer->AllocateUboResource(uboPool, UBO_GLOBAL_RESOURCE_TYPE, &globalUbo);
     renderer->BindUboPoolToPipeline(pipelineId, uboPool, globalUbo);
-    renderer->UpdateSkyboxData(nullptr, uboPool, globalUbo);
 
     globalUboBuffer = new char[sizeof(Camera) + lights.size() * sizeof(Light)];
     memcpy(globalUboBuffer + sizeof(Camera), lights.data(), lights.size() * sizeof(Light));
@@ -54,7 +53,7 @@ Composer::Composer(
     memcpy(globalUboBuffer + sizeof(XMFLOAT4X4), &proj, sizeof(XMFLOAT4X4));
 
     GenerateObjects();
-    UpdateTextures(dims);
+    UpdateTextures(dims, { 500,  500 });
 }
 
 void Composer::RenderScene()
@@ -74,25 +73,47 @@ void Composer::AddWalkableCuboid(
 }
 
 void Composer::UpdateTextures(
-    const std::vector<TextureDim>& dims)
+    const std::vector<TextureDim>& dims,
+    TextureDim skyboxDims)
 {
-    Texel* texData = new Texel[300 * 300];
+    Texel* texData = new Texel[500 * 500];
 
-    Texel sourceTexels[6] = { {255, 255, 255, 255},
+    Texel sourceTexels[7] = { {255, 255, 255, 255},
                               {12, 56, 230, 255},
                               {120, 120, 50, 255},
                               {2, 150, 2, 255},
                               {120, 5, 5, 255},
-                              {40, 40, 40, 255} };
+                              {40, 40, 40, 255},
+                              {0, 0, 0, 1} };
 
     for (int i = 0; i < 6; i++)
     {
         for (int j = 0; j < dims[i].height * dims[i].width; j++)
         {
-            texData[j] = sourceTexels[i];
+            texData[j].a = sourceTexels[i].a;
+            texData[j].r = sourceTexels[i].r;
+            texData[j].g = sourceTexels[i].g;
+            texData[j].b = sourceTexels[i].b;
         }
         renderer->UploadTexture(pipelineId, i, (char*)texData);
     }
+
+
+    for (int j = 0; j < skyboxDims.width * skyboxDims.height; j++)
+    {
+        texData[j].a = sourceTexels[6].a;
+        texData[j].r = sourceTexels[6].r;
+        texData[j].g = sourceTexels[6].g;
+        texData[j].b = sourceTexels[6].b;
+    }
+    
+
+
+     vector<const char*> textures{ (char*)texData, (char*)texData, (char*)texData, (char*)texData, (char*)texData, (char*)texData };
+     renderer->UpdateSkyboxData(textures, uboPool, globalUbo);
+    
+
+
     delete[] texData;
 }
 

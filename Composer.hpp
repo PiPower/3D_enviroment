@@ -39,7 +39,8 @@ struct Composer
 		uint8_t faceId);
 
 	void UpdateTextures(
-		const std::vector<TextureDim>& dims);
+		const std::vector<TextureDim>& dims,
+		TextureDim skyboxDims = { 0, 0 });
 
 	bool CheckIfObjIsOnWalkableCuboidSurface(
 		const DirectX::XMFLOAT3& ptOnCuboid,

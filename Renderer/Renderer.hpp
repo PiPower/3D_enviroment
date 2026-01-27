@@ -30,7 +30,8 @@ public:
 	int64_t UploadTexture(
 		uint64_t pipelineId,
 		uint8_t textureId,
-		const char* data);
+		const char* data,
+		uint32_t texInstanceIdx = 0);
 
 	/*
 		maximum number of render items per mesh collection is 0xFFFFFFFFFFFF
@@ -60,7 +61,7 @@ public:
 	void BeginRendering();
 
 	int64_t UpdateSkyboxData(
-		const char** facePtrArray,
+		const std::vector<const char*>& facePtrArray,
 		uint64_t uboPoolId,
 		uint64_t globalUboId);
 
@@ -114,7 +115,9 @@ private:
 		VulkanPipelineData* pipelineData);
 
 	void PrepareTextureData(
-		VulkanPipelineData* pipelineData);
+		VulkanPipelineData* pipelineData,
+		const std::vector<TextureDim>& texDims,
+		bool isCubemap = false);
 
 	void CreateSkyboxPipeline(
 		TextureDim* skyboxDim);
@@ -128,7 +131,7 @@ private:
 	ShaderCompiler compiler;
 	VkImageCopy computeSwapchainCopy;
 	AllocatedBuffer stagingBuffer;
-	VulkanPipelineData* skyboxPipeline;
+	uint64_t skyboxPipelineId;
 	char* stagingPtr;
 	std::vector<VkRenderPassBeginInfo> renderPassInfos;
 	std::vector<VkImageMemoryBarrier> transferBarriers;
