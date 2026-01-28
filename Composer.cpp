@@ -53,7 +53,7 @@ Composer::Composer(
     memcpy(globalUboBuffer + sizeof(XMFLOAT4X4), &proj, sizeof(XMFLOAT4X4));
 
     GenerateObjects();
-    UpdateTextures(dims, { 500,  500 });
+    UpdateTextures(dims, { 1000,  1000 });
 }
 
 void Composer::RenderScene()
@@ -76,8 +76,7 @@ void Composer::UpdateTextures(
     const std::vector<TextureDim>& dims,
     TextureDim skyboxDims)
 {
-    Texel* texData = new Texel[500 * 500];
-    Texel* texData2 = new Texel[500 * 500];
+    Texel* texData = new Texel[1000 * 1000];
 
     Texel sourceTexels[7] = { {255, 255, 255, 255},
                               {12, 56, 230, 255},
@@ -108,22 +107,40 @@ void Composer::UpdateTextures(
         texData[j].b = sourceTexels[6].b;
     }
     
-    for (int j = 0; j < skyboxDims.width * skyboxDims.height; j++)
+    for (int y = 0; y < skyboxDims.height; y++)
     {
-        texData2[j].a = 255;
-        texData2[j].r = 244;
-        texData2[j].g = 22;
-        texData2[j].b = 128;
+        for (int x = 0; x < skyboxDims.width; x++)
+        {
+            float x0 = ((float)x / (float)skyboxDims.width) * 3 - 2.2f;
+            float y0 = ((float)y / (float)skyboxDims.height) * 3 - 1.4f;
+            float z_x = 0;
+            float z_y = 0;
+            constexpr uint16_t max_iteration = 300;
+            uint16_t i = 0;
+            while(z_x * z_x + z_y * z_y < 4.0f &&  i < max_iteration)
+            {
+                float xtemp = z_x * z_x - z_y * z_y + x0;
+                z_y = 2 * z_x * z_y + y0;
+                z_x = xtemp;
+                i++;
+            }
+
+
+            texData[skyboxDims.width * y + x].a = 255;
+            texData[skyboxDims.width * y + x].r = ((float)i / (float)max_iteration) * 255;
+            texData[skyboxDims.width * y + x].g = sinf(((float)i / (float)max_iteration) * 2 * 3.14) * 255;
+            texData[skyboxDims.width * y + x].b = ((float)i / (float)max_iteration) * 255;
+        }
     }
 
 
-     vector<const char*> textures{ (char*)texData2, (char*)texData, (char*)texData, (char*)texData, (char*)texData, (char*)texData };
+
+     vector<const char*> textures{ (char*)texData, (char*)texData, (char*)texData, (char*)texData, (char*)texData, (char*)texData };
      renderer->UpdateSkyboxData(textures, uboPool, globalUbo);
     
 
 
     delete[] texData;
-    delete[] texData2;
 }
 
 bool Composer::CheckIfObjIsOnWalkableCuboidSurface(

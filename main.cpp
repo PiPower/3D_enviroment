@@ -9,8 +9,8 @@ using namespace std;
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 {
     Window wnd(1600, 900, L"yolo", L"test");
-    TextureDim skyboxDim = { 500, 500 };
-    Renderer renderer(hInstance, wnd.GetWindowHWND(), &skyboxDim);
+    TextureDim skyboxDim = { 1000, 1000 };
+    Renderer renderer(hInstance, wnd.GetWindowHWND(), &skyboxDim, 1'000'000'000);
     PhysicsEnigne physicsEngine{};
     Composer comp(&renderer, &physicsEngine);
 
