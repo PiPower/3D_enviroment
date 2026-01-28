@@ -219,7 +219,7 @@ int64_t Renderer::UploadTexture(
     copyRegion.bufferImageHeight = 0;
     copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     copyRegion.imageSubresource.mipLevel = 0;
-    copyRegion.imageSubresource.baseArrayLayer = 0;
+    copyRegion.imageSubresource.baseArrayLayer = texInstanceIdx;
     copyRegion.imageSubresource.layerCount = 1;
     copyRegion.imageOffset = { 0, 0, 0 };
     copyRegion.imageExtent = { pipelineData->texDims[textureId].width,
@@ -1037,7 +1037,7 @@ void Renderer::CreateSkyboxPipeline(
     rasterInfo.rasterizerDiscardEnable = VK_FALSE;
     rasterInfo.polygonMode = VK_POLYGON_MODE_FILL;
     rasterInfo.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
     rasterInfo.depthBiasEnable = VK_FALSE;
     rasterInfo.depthBiasConstantFactor = 0.0f;
     rasterInfo.depthBiasClamp = 0.0f;
@@ -1056,13 +1056,8 @@ void Renderer::CreateSkyboxPipeline(
 
     VkPipelineColorBlendAttachmentState colorBlendAttachment{};
     colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    colorBlendAttachment.blendEnable = VK_TRUE;
-    colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA; // Optional
-    colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA; // Optional
-    colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD; // Optional
-    colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA; // Optional
-    colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA; // Optional
-    colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD; // Optional
+    colorBlendAttachment.blendEnable = VK_FALSE;
+
 
     VkPipelineColorBlendStateCreateInfo blendInfo = {};
     blendInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
@@ -1088,7 +1083,7 @@ void Renderer::CreateSkyboxPipeline(
     depthInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
     depthInfo.depthTestEnable = VK_TRUE;
     depthInfo.depthWriteEnable = VK_TRUE;
-    depthInfo.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthInfo.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
     depthInfo.depthBoundsTestEnable = VK_FALSE;
     depthInfo.stencilTestEnable = VK_FALSE;
 

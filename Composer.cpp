@@ -77,6 +77,7 @@ void Composer::UpdateTextures(
     TextureDim skyboxDims)
 {
     Texel* texData = new Texel[500 * 500];
+    Texel* texData2 = new Texel[500 * 500];
 
     Texel sourceTexels[7] = { {255, 255, 255, 255},
                               {12, 56, 230, 255},
@@ -84,7 +85,7 @@ void Composer::UpdateTextures(
                               {2, 150, 2, 255},
                               {120, 5, 5, 255},
                               {40, 40, 40, 255},
-                              {0, 0, 0, 1} };
+                              {90, 233, 233, 255} };
 
     for (int i = 0; i < 6; i++)
     {
@@ -107,14 +108,22 @@ void Composer::UpdateTextures(
         texData[j].b = sourceTexels[6].b;
     }
     
+    for (int j = 0; j < skyboxDims.width * skyboxDims.height; j++)
+    {
+        texData2[j].a = 255;
+        texData2[j].r = 244;
+        texData2[j].g = 22;
+        texData2[j].b = 128;
+    }
 
 
-     vector<const char*> textures{ (char*)texData, (char*)texData, (char*)texData, (char*)texData, (char*)texData, (char*)texData };
+     vector<const char*> textures{ (char*)texData2, (char*)texData, (char*)texData, (char*)texData, (char*)texData, (char*)texData };
      renderer->UpdateSkyboxData(textures, uboPool, globalUbo);
     
 
 
     delete[] texData;
+    delete[] texData2;
 }
 
 bool Composer::CheckIfObjIsOnWalkableCuboidSurface(
