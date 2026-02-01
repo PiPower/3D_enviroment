@@ -39,7 +39,7 @@ layout(location = 2) in vec4 worldPos;
 layout(location = 0) out vec4 outColor;
 void main()
 {
- 
+
     vec3 lightVec = normalize(global.lights[0].pos.xyz - worldPos.xyz);
     float diffCoeff = max(dot(normalize(faceNormal), lightVec), 0.0);
     vec3 diffuseLight = diffCoeff * global.lights[0].color.rgb;

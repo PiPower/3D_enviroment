@@ -58,12 +58,16 @@ int64_t createVulkanResources(
 	vkResources->cmdBuffer = cmdBuffs[0];
 	vkResources->sideCmdBuffer = cmdBuffs[1];
 	vkResources->renderPass = createRenderPass(vkResources->device, VK_FORMAT_R8G8B8A8_UNORM);
-	DepthBufferBundle bundle = createDepthBuffer(vkResources->device, vkResources->physicalDevice, vkResources->swapchainInfo);
+	DepthBufferBundle bundle = createDepthBuffer(vkResources->device, vkResources->physicalDevice, 
+			vkResources->swapchainInfo.capabilities.currentExtent.width, vkResources->swapchainInfo.capabilities.currentExtent.height);
 	vkResources->depthImage = bundle.depthImage;
 	vkResources->depthImageMemory = bundle.depthImageMemory;
 	vkResources->depthImageView = bundle.depthImageView;
+	vkResources->shadowmapTexture = createDepthBuffer(vkResources->device, vkResources->physicalDevice,
+		vkResources->swapchainInfo.capabilities.currentExtent.width, vkResources->swapchainInfo.capabilities.currentExtent.height, true);
+
 	vkResources->swapchainFramebuffers = createFramebuffers(vkResources->device, vkResources->renderPass,
-		vkResources->depthImageView, textureViews, vkResources->swapchainInfo);
+		vkResources->depthImageView, vkResources->shadowmapTexture.depthImageView, textureViews, vkResources->swapchainInfo);
 
 	VkSemaphoreCreateInfo semaphoreInfo{};
 	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -585,6 +589,7 @@ static VkInstance createInstance()
 	instanceInfo.ppEnabledExtensionNames = instExt;
 	instanceInfo.enabledLayerCount = sizeof(vaLayers) / sizeof(const char*);
 	instanceInfo.ppEnabledLayerNames = vaLayers;
+	instanceInfo.pApplicationInfo = &appInfo;
 
 	VkInstance instance = VK_NULL_HANDLE;
 	EXIT_ON_VK_ERROR(vkCreateInstance(&instanceInfo, nullptr, &instance));
@@ -971,7 +976,17 @@ static VkRenderPass createRenderPass(
 	VkFormat imgFormat)
 {
 	VkRenderPass renderPass;
-	VkAttachmentDescription attachmentDesc[2] = {};
+	VkAttachmentDescription attachmentDesc[3] = {};
+
+	attachmentDesc[2].format = VK_FORMAT_D32_SFLOAT;
+	attachmentDesc[2].samples = VK_SAMPLE_COUNT_1_BIT;
+	attachmentDesc[2].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	attachmentDesc[2].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachmentDesc[2].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	attachmentDesc[2].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachmentDesc[2].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	attachmentDesc[2].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	
 	attachmentDesc[1].format = imgFormat;
 	attachmentDesc[1].samples = VK_SAMPLE_COUNT_1_BIT;
 	attachmentDesc[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -993,32 +1008,45 @@ static VkRenderPass createRenderPass(
 	VkAttachmentReference colorAttachmentRef{};
 	colorAttachmentRef.attachment = 1;
 	colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-	VkAttachmentReference depthAttachmentRef{};
-	depthAttachmentRef.attachment = 0;
-	depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	VkAttachmentReference depthAttachmentRef[2] = {};
+	depthAttachmentRef[1].attachment = 2;
+	depthAttachmentRef[1].layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-	VkSubpassDescription subpass = {};
-	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-	subpass.colorAttachmentCount = 1;
-	subpass.pColorAttachments = &colorAttachmentRef;
-	subpass.pDepthStencilAttachment = &depthAttachmentRef;
+	depthAttachmentRef[0].attachment = 0;
+	depthAttachmentRef[0].layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-	VkSubpassDependency dependency{};
-	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-	dependency.dstSubpass = 0;
-	dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-	dependency.srcAccessMask = 0;
-	dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-	dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	VkSubpassDescription subpass[2] = {};
+	subpass[1].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass[1].colorAttachmentCount = 1;
+	subpass[1].pColorAttachments = &colorAttachmentRef;
+	subpass[1].pDepthStencilAttachment = &depthAttachmentRef[0];
+
+	subpass[0].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass[0].pDepthStencilAttachment = &depthAttachmentRef[1];
+
+	VkSubpassDependency dependency[2] = {};
+	dependency[1].srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependency[1].dstSubpass = 1;
+	dependency[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+	dependency[1].srcAccessMask = 0;
+	dependency[1].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+	dependency[1].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+	dependency[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependency[0].dstSubpass = 0;
+	dependency[0].srcStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+	dependency[0].srcAccessMask = 0;
+	dependency[0].dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+	dependency[0].dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
 	VkRenderPassCreateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	info.attachmentCount = 2;
+	info.attachmentCount = 3;
 	info.pAttachments = attachmentDesc;
-	info.subpassCount = 1;
-	info.pSubpasses = &subpass;
-	info.dependencyCount = 1;
-	info.pDependencies = &dependency;
+	info.subpassCount = 2;
+	info.pSubpasses = subpass;
+	info.dependencyCount = 2;
+	info.pDependencies = dependency;
 
 	EXIT_ON_VK_ERROR(vkCreateRenderPass(device, &info, nullptr, &renderPass));
 
@@ -1028,7 +1056,9 @@ static VkRenderPass createRenderPass(
 static DepthBufferBundle createDepthBuffer(
 	VkDevice device, 
 	VkPhysicalDevice physicalDevice, 
-	const SwapchainInfo& swcInfo)
+	uint32_t width,
+	uint32_t height,
+	bool isShadowmap)
 {
 	DepthBufferBundle bundleOut = {};
 
@@ -1042,12 +1072,12 @@ static DepthBufferBundle createDepthBuffer(
 	VkImageCreateInfo imageInfo = {};
 	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	imageInfo.imageType = VK_IMAGE_TYPE_2D;
-	imageInfo.extent.width = swcInfo.capabilities.currentExtent.width;
-	imageInfo.extent.height = swcInfo.capabilities.currentExtent.height;
+	imageInfo.extent.width = width;
+	imageInfo.extent.height = height;
 	imageInfo.extent.depth = 1;
 	imageInfo.mipLevels = 1;
 	imageInfo.arrayLayers = 1;
-	imageInfo.format = VK_FORMAT_D32_SFLOAT_S8_UINT;
+	imageInfo.format = isShadowmap ? VK_FORMAT_D32_SFLOAT : VK_FORMAT_D32_SFLOAT_S8_UINT ;
 	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
@@ -1065,7 +1095,7 @@ static DepthBufferBundle createDepthBuffer(
 	viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 	viewInfo.image = bundleOut.depthImage;
 	viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-	viewInfo.format = VK_FORMAT_D32_SFLOAT_S8_UINT;
+	viewInfo.format = isShadowmap ? VK_FORMAT_D32_SFLOAT : VK_FORMAT_D32_SFLOAT_S8_UINT;
 	viewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
 	viewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
 	viewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -1083,18 +1113,19 @@ static std::vector<VkFramebuffer> createFramebuffers(
 	VkDevice device,
 	VkRenderPass renderPass, 
 	VkImageView depthView,
+	VkImageView shadowmapView,
 	const std::vector<VkImageView> imgViews,
 	const SwapchainInfo& swcInfo)
 {
 	vector<VkFramebuffer> framebuffers(imgViews.size());
 	for (size_t i = 0; i < imgViews.size(); i++)
 	{
-		VkImageView views[2] = { depthView, imgViews[i] };
+		VkImageView views[3] = {depthView, imgViews[i], shadowmapView };
 
 		VkFramebufferCreateInfo info = {};
 		info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 		info.renderPass = renderPass;
-		info.attachmentCount = 2;
+		info.attachmentCount = 3;
 		info.pAttachments = views;
 		info.width = swcInfo.capabilities.currentExtent.width;
 		info.height = swcInfo.capabilities.currentExtent.height;

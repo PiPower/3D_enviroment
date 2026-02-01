@@ -1,13 +1,5 @@
 #pragma once
 
-
-struct DepthBufferBundle
-{
-	VkImage depthImage;
-	VkDeviceMemory depthImageMemory;
-	VkImageView depthImageView;
-};
-
 static VkInstance createInstance();
 
 static bool checkSupportForExt(
@@ -85,11 +77,14 @@ static VkRenderPass createRenderPass(
 static DepthBufferBundle createDepthBuffer(
 	VkDevice device,
 	VkPhysicalDevice physicalDevice,
-	const SwapchainInfo& swcInfo);
+	uint32_t width,
+	uint32_t height,
+	bool isShadowmap = false);
 
 static std::vector<VkFramebuffer> createFramebuffers(
 	VkDevice device,
 	VkRenderPass renderPass,
 	VkImageView	depthView,
+	VkImageView shadowmapView,
 	const std::vector<VkImageView> imgViews,
 	const SwapchainInfo& swcInfo);

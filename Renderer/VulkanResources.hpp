@@ -51,6 +51,13 @@ struct CpuBuffer
 	VkDeviceSize size;
 };
 
+struct DepthBufferBundle
+{
+	VkImage depthImage;
+	VkDeviceMemory depthImageMemory;
+	VkImageView depthImageView;
+};
+
 struct VulkanResources
 {
 	VkInstance instance;
@@ -70,6 +77,7 @@ struct VulkanResources
 	std::vector<VkImage> swapchainImages;
 	std::vector<VkImageView> swapchainImageViews;
 	std::vector<VkFramebuffer> swapchainFramebuffers;
+	DepthBufferBundle shadowmapTexture;
 	VkImage depthImage;
 	VkDeviceMemory depthImageMemory;
 	VkImageView depthImageView;
