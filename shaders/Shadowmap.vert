@@ -1,7 +1,4 @@
 #version 450
-#ifndef LIGHT_COUNT
-    #define LIGHT_COUNT
-#endif
 
 
 struct Light
@@ -14,7 +11,6 @@ layout(binding = 0) uniform Globals
 {
     mat4 view;
     mat4 proj;
-    Light lights[LIGHT_COUNT]; // (R, G, B, Intensity);
 } global;
 
 layout(binding = 1) uniform  ObjectTransform

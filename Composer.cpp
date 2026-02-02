@@ -35,6 +35,8 @@ Composer::Composer(
 {
     lights = { Light{{1, 1, 1, 1.0f}, {0.0f, 100.0f, 0.0f, 0.2f} } };
     vector<TextureDim> dims(10, TextureDim{ 300, 300});
+
+    renderer->CreateGraphicsPipeline(0, {}, &shadowmapPipelineId, true);
     renderer->CreateGraphicsPipeline(lights.size(), dims ,&pipelineId);
 
     vector<GeometryEntry> boxGeo({ GeometryType::Box });

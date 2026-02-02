@@ -25,7 +25,8 @@ public:
 	int64_t CreateGraphicsPipeline(
 		uint8_t lightCount,
 		const std::vector<TextureDim>& textureDims,
-		uint64_t* pipeline);
+		uint64_t* pipeline,
+		bool isShadowPipeline = false);
 
 	int64_t UploadTexture(
 		uint64_t pipelineId,
@@ -100,7 +101,8 @@ private:
 		VkPipelineLayout pipelineLayout,
 		VkPipeline* pipeline,
 		uint8_t lightCount,
-		uint8_t textureCount);
+		uint8_t textureCount,
+		bool isShadowPipeline);
 
 	void CreateGraphicsSets(
 		VulkanPipelineData* pipelineData);

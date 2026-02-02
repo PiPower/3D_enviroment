@@ -149,7 +149,8 @@ int64_t Renderer::UpdateSkyboxData(
 int64_t Renderer::CreateGraphicsPipeline(
     uint8_t lightCount,
     const std::vector<TextureDim>& textureDims,
-    uint64_t* pipelineId)
+    uint64_t* pipelineId,
+    bool isShadowPipeline)
 {
 
     if (textureDims.size() > 0xFFu)
@@ -163,11 +164,14 @@ int64_t Renderer::CreateGraphicsPipeline(
     pipeline->texDims = textureDims;
 
     CreateBasicGraphicsLayout(pipeline->texDims.size(), &pipeline->descriptorSetLayout, &pipeline->pipelineLayout);
-    CreateBasicGraphicsVkPipeline(pipeline->pipelineLayout, &pipeline->pipeline, lightCount, pipeline->texDims.size());
+    CreateBasicGraphicsVkPipeline(pipeline->pipelineLayout, &pipeline->pipeline, lightCount, pipeline->texDims.size(), isShadowPipeline);
     CreateGraphicsSets(pipeline);
-    CreateSampler(pipeline);
-    PrepareTextureData(pipeline, pipeline->texDims);
-    SetImageSets(pipeline);
+    if (pipeline->texDims.size() > 0)
+    {
+        CreateSampler(pipeline);
+        PrepareTextureData(pipeline, pipeline->texDims);
+        SetImageSets(pipeline);
+    }
     *pipelineId = pipelines.size() - 1;
     return 0;
 }
@@ -1101,7 +1105,7 @@ void Renderer::CreateSkyboxPipeline(
     pipelineInfo.pDynamicState = &dynamicState;
     pipelineInfo.layout = skyboxPipeline->pipelineLayout;
     pipelineInfo.renderPass = vkResources.renderPass;
-    pipelineInfo.subpass = 0;
+    pipelineInfo.subpass = 1;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.basePipelineIndex = -1;
 
@@ -1119,13 +1123,16 @@ void Renderer::CreateGraphicsSets(
     VkDescriptorPoolSize gfxPoolSize[2] = {};
     gfxPoolSize[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
     gfxPoolSize[0].descriptorCount = GFX_ENTRY_COUNT * pipelineData->maxSets; 
-    gfxPoolSize[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    gfxPoolSize[1].descriptorCount = pipelineData->texDims.size() * pipelineData->maxSets;
+    if (pipelineData->texDims.size() > 0)
+    {
+        gfxPoolSize[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        gfxPoolSize[1].descriptorCount = pipelineData->texDims.size() * pipelineData->maxSets;
+    }
 
     VkDescriptorPoolCreateInfo gfxPoolDesc = {};
     gfxPoolDesc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     gfxPoolDesc.maxSets = pipelineData->maxSets;
-    gfxPoolDesc.poolSizeCount = 2;
+    gfxPoolDesc.poolSizeCount = pipelineData->texDims.size() > 0 ? 2 : 1;
     gfxPoolDesc.pPoolSizes = gfxPoolSize;
     EXIT_ON_VK_ERROR(vkCreateDescriptorPool(vkResources.device, &gfxPoolDesc, nullptr, &pipelineData->descriptorPool));
 
@@ -1182,7 +1189,8 @@ void Renderer::CreateBasicGraphicsVkPipeline(
     VkPipelineLayout pipelineLayout,
     VkPipeline* pipeline,
     uint8_t lightCount,
-    uint8_t textureCount)
+    uint8_t textureCount, 
+    bool isShadowPipeline)
 {
     ShaderOptions opts;
     string strLightCount = to_string(lightCount);
@@ -1190,9 +1198,20 @@ void Renderer::CreateBasicGraphicsVkPipeline(
 
     opts.AddOption("LIGHT_COUNT", strLightCount.c_str());
     opts.AddOption("TEXTURE_COUNT", strTextureCount.c_str());
-    VkShaderModule vertexShader = compiler.CompileShaderFromPath(vkResources.device, nullptr, "shaders/basic.vert", "main", shaderc_vertex_shader, opts);
-    VkShaderModule fragmentShader = compiler.CompileShaderFromPath(vkResources.device, nullptr, "shaders/basic.frag", "main", shaderc_fragment_shader, opts);
-
+    VkShaderModule vertexShader = VK_NULL_HANDLE;
+    if (isShadowPipeline)
+    {
+        vertexShader = compiler.CompileShaderFromPath(vkResources.device, nullptr, "shaders/Shadowmap.vert", "main", shaderc_vertex_shader, opts);
+    }
+    else
+    {
+        vertexShader = compiler.CompileShaderFromPath(vkResources.device, nullptr, "shaders/basic.vert", "main", shaderc_vertex_shader, opts);
+    }
+    VkShaderModule fragmentShader = VK_NULL_HANDLE;
+    if (!isShadowPipeline)
+    {
+        fragmentShader = compiler.CompileShaderFromPath(vkResources.device, nullptr, "shaders/basic.frag", "main", shaderc_fragment_shader, opts);
+    }
 
     VkPipelineShaderStageCreateInfo shaderInfo[2] = {};
     shaderInfo[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -1306,7 +1325,7 @@ void Renderer::CreateBasicGraphicsVkPipeline(
 
     VkGraphicsPipelineCreateInfo pipelineInfo = {};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.stageCount = 2;
+    pipelineInfo.stageCount = isShadowPipeline ? 1 : 2;
     pipelineInfo.pStages = shaderInfo;
     pipelineInfo.pVertexInputState = &inputStateInfo;
     pipelineInfo.pInputAssemblyState = &inputAss;
@@ -1318,7 +1337,7 @@ void Renderer::CreateBasicGraphicsVkPipeline(
     pipelineInfo.pDynamicState = &dynamicState;
     pipelineInfo.layout = pipelineLayout;
     pipelineInfo.renderPass = vkResources.renderPass;
-    pipelineInfo.subpass = 0;
+    pipelineInfo.subpass = isShadowPipeline ? 0 : 1;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.basePipelineIndex = -1;
 

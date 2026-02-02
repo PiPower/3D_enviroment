@@ -76,6 +76,7 @@ public:
 	bool calculatePhysics;
 	bool frameMode;
 	uint64_t pipelineId;
+	uint64_t shadowmapPipelineId;
 	// ----- character management ----- 
 	DirectX::XMFLOAT3 scalesVel;
 	DirectX::XMFLOAT3 characterVelocity;
@@ -96,6 +97,7 @@ public:
 	std::vector<RenderItem> renderEntities;
 	// ----- camera related -----
 	uint64_t globalUbo;
+	uint64_t shadowmapGlobalUbo;
 	CameraOrientation camOrientation;
 	std::vector<Light> lights;
 	char* globalUboBuffer;
