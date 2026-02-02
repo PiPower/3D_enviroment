@@ -57,6 +57,10 @@ struct Composer
 		Window* window,
 		float dt);
 
+	void UpdateGlobalBuffer();
+	
+	void UpdateShadowmapGlobalBuffer();
+
 	void AddBody( const ShapeType& type, 
 		const BodyProperties& props,
 		const DirectX::XMFLOAT3& scales, 
@@ -101,5 +105,6 @@ public:
 	CameraOrientation camOrientation;
 	std::vector<Light> lights;
 	char* globalUboBuffer;
+	char* shadowmapUboBuffer;
 };
 
