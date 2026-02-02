@@ -1024,7 +1024,15 @@ static VkRenderPass createRenderPass(
 	subpass[0].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 	subpass[0].pDepthStencilAttachment = &depthAttachmentRef[1];
 
-	VkSubpassDependency dependency[2] = {};
+	VkSubpassDependency dependency[3] = {};
+
+	dependency[2].srcSubpass = 0;
+	dependency[2].dstSubpass = VK_SUBPASS_EXTERNAL;
+	dependency[2].srcStageMask = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+	dependency[2].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	dependency[2].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	dependency[2].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
 	dependency[1].srcSubpass = VK_SUBPASS_EXTERNAL;
 	dependency[1].dstSubpass = 1;
 	dependency[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
@@ -1045,7 +1053,7 @@ static VkRenderPass createRenderPass(
 	info.pAttachments = attachmentDesc;
 	info.subpassCount = 2;
 	info.pSubpasses = subpass;
-	info.dependencyCount = 2;
+	info.dependencyCount = 3;
 	info.pDependencies = dependency;
 
 	EXIT_ON_VK_ERROR(vkCreateRenderPass(device, &info, nullptr, &renderPass));

@@ -108,5 +108,6 @@
     <None Include="shaders\basic.frag" />
     <None Include="shaders\Skybox.vert" />
     <None Include="shaders\Skybox.frag" />
+    <None Include="shaders\Shadowmap.vert" />
   </ItemGroup>
 </Project>

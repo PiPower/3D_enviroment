@@ -191,6 +191,7 @@
     <None Include="shaders\basic.frag" />
     <None Include="shaders\basic.vert" />
     <None Include="shaders\post_process.comp" />
+    <None Include="shaders\Shadowmap.vert" />
     <None Include="shaders\Skybox.frag" />
     <None Include="shaders\Skybox.vert" />
   </ItemGroup>
