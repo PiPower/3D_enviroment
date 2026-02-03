@@ -3,8 +3,8 @@
 #include "ShaderCompiler.hpp"
 #include "GraphicsTypes.hpp"
 #define VULKAN_RENDERER_ERROR 0xFFFFFFFFFFFFFFFF;
-#define UBO_GLOBAL_RESOURCE_TYPE 1
-#define UBO_OBJ_TRSF_RESOURCE_TYPE 2
+#define UBO_GLOBAL_RESOURCE_TYPE 0
+#define UBO_OBJ_TRSF_RESOURCE_TYPE 1
 
 enum class PipelineTypes
 {
@@ -59,12 +59,15 @@ public:
 		uint64_t uboPoolId,
 		uint64_t globalUboId);
 
-	void BeginRendering();
 
 	int64_t UpdateSkyboxData(
 		const std::vector<const char*>& facePtrArray,
 		uint64_t uboPoolId,
 		uint64_t globalUboId);
+
+	void BeginShadowPass();
+
+	void BeginRenderPass();
 
 	void Render(
 		uint64_t meshCollectionId,

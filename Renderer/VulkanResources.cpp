@@ -981,11 +981,11 @@ static VkRenderPass createRenderPass(
 	attachmentDesc[2].format = VK_FORMAT_D32_SFLOAT;
 	attachmentDesc[2].samples = VK_SAMPLE_COUNT_1_BIT;
 	attachmentDesc[2].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	attachmentDesc[2].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachmentDesc[2].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	attachmentDesc[2].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	attachmentDesc[2].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 	attachmentDesc[2].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	attachmentDesc[2].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	attachmentDesc[2].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 	
 	attachmentDesc[1].format = imgFormat;
 	attachmentDesc[1].samples = VK_SAMPLE_COUNT_1_BIT;
@@ -1088,7 +1088,7 @@ static DepthBufferBundle createDepthBuffer(
 	imageInfo.format = isShadowmap ? VK_FORMAT_D32_SFLOAT : VK_FORMAT_D32_SFLOAT_S8_UINT ;
 	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+	imageInfo.usage = isShadowmap ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT : VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 

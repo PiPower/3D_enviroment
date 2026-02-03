@@ -33,7 +33,7 @@ Composer::Composer(
     orientationDir({ 1, 0, 0 }), forwardDir({ 1, 0, 0 }), upDir({ 0,1,0 }), rightDir({ 0,0,-1 }),
     characterVelocityCoeff({ 70000, 70000, 70000 }), freeFall(true), scalesVel({1.0f, 1.0f, 1.0f})
 {
-    lights = { Light{{1, 1, 1, 1.0f}, {0.0f, 100.0f, 0.0f, 0.2f} } };
+    lights = { Light{{1, 1, 1, 1.0f}, {0.0f, 50.0f, 0.0f, 0.2f} } };
     vector<TextureDim> dims(10, TextureDim{ 300, 300});
 
     renderer->CreateGraphicsPipeline(0, {}, &shadowmapPipelineId, true);
@@ -60,7 +60,9 @@ void Composer::RenderScene()
 {
     UpdateCamera();
 
-    renderer->BeginRendering();
+    renderer->BeginShadowPass();
+    renderer->Render(boxCollection, shadowmapPipelineId, renderEntities);
+    renderer->BeginRenderPass();
     renderer->Render(boxCollection, pipelineId, renderEntities);
     renderer->Present();
 }
@@ -479,18 +481,17 @@ void Composer::UpdateGlobalBuffer()
 void Composer::UpdateShadowmapGlobalBuffer()
 {
     XMFLOAT4X4 proj;
-    XMStoreFloat4x4(&proj, XMMatrixOrthographicLH(3.14f / 4.0f, 1600.0f / 900.0f, 0.1f, 128.0f));
+    XMStoreFloat4x4(&proj, XMMatrixOrthographicLH(20, 20, 0.1f, 128.0f));
     proj._22 *= -1.0f;// vulkan has -1.0f on top and 1.0f on bottom
-    memcpy(globalUboBuffer + sizeof(XMFLOAT4X4), &proj, sizeof(XMFLOAT4X4));
-
+    memcpy(shadowmapUboBuffer + sizeof(XMFLOAT4X4), &proj, sizeof(XMFLOAT4X4));
     XMVECTOR lightPos = XMLoadFloat4(&lights[0].pos);
-    XMVECTOR lightDir = XMVectorSet(0, 1, 0 ,0 );
+    XMVECTOR lightDir = XMVectorSet(0, -1, 0 ,0 );
     XMVECTOR lightUp = XMVectorSet(1, 0, 0, 0);
     XMFLOAT4X4 view;
     XMStoreFloat4x4(&view, XMMatrixLookToLH(lightPos, lightDir, lightUp));
 
     memcpy(shadowmapUboBuffer, &view, sizeof(XMFLOAT4X4));
-    renderer->UpdateUboMemory(uboPool, shadowmapGlobalUbo, globalUboBuffer);
+    renderer->UpdateUboMemory(uboPool, shadowmapGlobalUbo, shadowmapUboBuffer);
 }
 
 void Composer::AddBody(

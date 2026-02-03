@@ -62,35 +62,6 @@ Renderer::Renderer(
     }
 }
 
-void Renderer::BeginRendering()
-{
-    EXIT_ON_VK_ERROR(vkWaitForFences(vkResources.device, 1, &vkResources.gfxQueueFinished, VK_TRUE, UINT64_MAX));
-    EXIT_ON_VK_ERROR(vkResetFences(vkResources.device, 1, &vkResources.gfxQueueFinished));
-    EXIT_ON_VK_ERROR(vkAcquireNextImageKHR(vkResources.device, vkResources.swapchain, UINT64_MAX, vkResources.imgReady, VK_NULL_HANDLE, &imageIndex));
-
-    VkCommandBufferBeginInfo cmdBuffInfo = {};
-    cmdBuffInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    cmdBuffInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    EXIT_ON_VK_ERROR(vkResetCommandBuffer(vkResources.cmdBuffer, 0));
-    EXIT_ON_VK_ERROR(vkBeginCommandBuffer(vkResources.cmdBuffer, &cmdBuffInfo));
-
-    vkCmdBeginRenderPass(vkResources.cmdBuffer, &renderPassInfos[imageIndex], VK_SUBPASS_CONTENTS_INLINE);
-
-    VkViewport viewport{};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = vkResources.swapchainInfo.capabilities.currentExtent.width;
-    viewport.height = vkResources.swapchainInfo.capabilities.currentExtent.height;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    vkCmdSetViewport(vkResources.cmdBuffer, 0, 1, &viewport);
-
-    VkRect2D scissor{};
-    scissor.offset = { 0, 0 };
-    scissor.extent = vkResources.swapchainInfo.capabilities.currentExtent;
-    vkCmdSetScissor(vkResources.cmdBuffer, 0, 1, &scissor);
-}
-
 int64_t Renderer::UpdateSkyboxData(
     const std::vector<const char*>& facePtrArray,
     uint64_t uboPoolId,
@@ -144,6 +115,55 @@ int64_t Renderer::UpdateSkyboxData(
     }
 
     return 0;
+}
+
+void Renderer::BeginShadowPass()
+{
+    EXIT_ON_VK_ERROR(vkWaitForFences(vkResources.device, 1, &vkResources.gfxQueueFinished, VK_TRUE, UINT64_MAX));
+    EXIT_ON_VK_ERROR(vkResetFences(vkResources.device, 1, &vkResources.gfxQueueFinished));
+    EXIT_ON_VK_ERROR(vkAcquireNextImageKHR(vkResources.device, vkResources.swapchain, UINT64_MAX, vkResources.imgReady, VK_NULL_HANDLE, &imageIndex));
+
+    VkCommandBufferBeginInfo cmdBuffInfo = {};
+    cmdBuffInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    cmdBuffInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    EXIT_ON_VK_ERROR(vkResetCommandBuffer(vkResources.cmdBuffer, 0));
+    EXIT_ON_VK_ERROR(vkBeginCommandBuffer(vkResources.cmdBuffer, &cmdBuffInfo));
+
+    vkCmdBeginRenderPass(vkResources.cmdBuffer, &renderPassInfos[imageIndex], VK_SUBPASS_CONTENTS_INLINE);
+
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = vkResources.swapchainInfo.capabilities.currentExtent.width;
+    viewport.height = vkResources.swapchainInfo.capabilities.currentExtent.height;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(vkResources.cmdBuffer, 0, 1, &viewport);
+
+    VkRect2D scissor{};
+    scissor.offset = { 0, 0 };
+    scissor.extent = vkResources.swapchainInfo.capabilities.currentExtent;
+    vkCmdSetScissor(vkResources.cmdBuffer, 0, 1, &scissor);
+
+}
+
+void Renderer::BeginRenderPass()
+{
+    vkCmdNextSubpass(vkResources.cmdBuffer, VK_SUBPASS_CONTENTS_INLINE);
+
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = vkResources.swapchainInfo.capabilities.currentExtent.width;
+    viewport.height = vkResources.swapchainInfo.capabilities.currentExtent.height;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(vkResources.cmdBuffer, 0, 1, &viewport);
+
+    VkRect2D scissor{};
+    scissor.offset = { 0, 0 };
+    scissor.extent = vkResources.swapchainInfo.capabilities.currentExtent;
+    vkCmdSetScissor(vkResources.cmdBuffer, 0, 1, &scissor);
 }
 
 int64_t Renderer::CreateGraphicsPipeline(
@@ -296,14 +316,14 @@ int64_t Renderer::CreateUboPool(
 
     poolSize += MAX_UBO_POOL_SIZE - poolSize % MAX_UBO_POOL_SIZE ;
     newPoolEntry->uboPool = {};
-    EXIT_ON_VK_ERROR(allocateMemoryPool(vkResources.device, vkResources.physicalDevice, poolSize, {MAX_UBO_POOL_SIZE, globalUboSize, localUboSize},
+    EXIT_ON_VK_ERROR(allocateMemoryPool(vkResources.device, vkResources.physicalDevice, poolSize, {globalUboSize, localUboSize, MAX_UBO_POOL_SIZE },
         {VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT},
         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
         &newPoolEntry->uboPool));
 
     while (newPoolEntry->uboPool.currOffset < newPoolEntry->uboPool.poolSize)
     {
-        EXIT_ON_VK_ERROR(createBufferInPool(0, vkResources.device, &newPoolEntry->uboPool));
+        EXIT_ON_VK_ERROR(createBufferInPool(2, vkResources.device, &newPoolEntry->uboPool));
     }
     EXIT_ON_VK_ERROR(vkMapMemory(vkResources.device, newPoolEntry->uboPool.deviceMemory, 0, poolSize, 0, (void**) &newPoolEntry->memoryMap));
     
@@ -322,7 +342,7 @@ int64_t Renderer::AllocateUboResource(
     }
 
     UboPoolEntry* uboPoolEntry = &uboPoolEntries[poolId - 1];
-    if (resourceId == 0 || resourceId > uboPoolEntry->uboPool.resourceReqs.size())
+    if (resourceId >= uboPoolEntry->uboPool.resourceReqs.size() - 1)
     {
         return -1;
     }
@@ -584,6 +604,7 @@ cleanup:
 void Renderer::CreateControllingStructs()
 {
     static 	VkClearValue clearColor[2];
+    clearColor[2].depthStencil = { 1.0f, 0 };
     clearColor[1].color = { {0.3f, 0.3f, 1.0f, 1.0f} };
     clearColor[0].depthStencil = { 1.0f, 0 };
 
@@ -596,7 +617,7 @@ void Renderer::CreateControllingStructs()
         renderPassInfos[i].framebuffer = vkResources.swapchainFramebuffers[i];
         renderPassInfos[i].renderArea.offset = { 0, 0 };
         renderPassInfos[i].renderArea.extent = vkResources.swapchainInfo.capabilities.currentExtent;
-        renderPassInfos[i].clearValueCount = 2;
+        renderPassInfos[i].clearValueCount = 3;
         renderPassInfos[i].pClearValues = clearColor;
     }
 
@@ -807,8 +828,12 @@ void Renderer::InitComputeSets(
 void Renderer::SetImageSets(
     VulkanPipelineData* pipelineData)
 {
-    vector<VkDescriptorImageInfo> texInfos(pipelineData->textures.size());
+    VkDescriptorImageInfo shadowmapInfo = {};
+    shadowmapInfo.imageView = vkResources.shadowmapTexture.depthImageView;
+    shadowmapInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+    shadowmapInfo.sampler = pipelineData->sampler;
 
+    vector<VkDescriptorImageInfo> texInfos(pipelineData->textures.size());
     for (int i = 0; i < texInfos.size(); i++)
     {
         texInfos[i] = {};
@@ -818,17 +843,26 @@ void Renderer::SetImageSets(
     }
 
 
-    vector<VkWriteDescriptorSet> updates(pipelineData->sets.size());
-    for (int i = 0; i < updates.size(); i++)
+    vector<VkWriteDescriptorSet> updates(pipelineData->sets.size() * 2);
+    for (int i = 0; i < pipelineData->sets.size(); i++)
     {
-        updates[i] = {};
-        updates[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        updates[i].dstSet = pipelineData->sets[i];
-        updates[i].dstBinding = GFX_SAMPLED_IMAGE;
-        updates[i].dstArrayElement = 0;
-        updates[i].descriptorCount = texInfos.size();
-        updates[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        updates[i].pImageInfo = texInfos.data();
+        updates[i * 2] = {};
+        updates[i * 2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        updates[i * 2].dstSet = pipelineData->sets[i];
+        updates[i * 2].dstBinding = GFX_SAMPLED_IMAGE;
+        updates[i * 2].dstArrayElement = 0;
+        updates[i * 2].descriptorCount = texInfos.size();
+        updates[i * 2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        updates[i * 2].pImageInfo = texInfos.data();
+
+        updates[i * 2 + 1] = {};
+        updates[i * 2 + 1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        updates[i * 2 + 1].dstSet = pipelineData->sets[i];
+        updates[i * 2 + 1].dstBinding = 3;
+        updates[i * 2 + 1].dstArrayElement = 0;
+        updates[i * 2 + 1].descriptorCount = 1;
+        updates[i * 2 + 1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        updates[i * 2 + 1].pImageInfo = &shadowmapInfo;
     }
 
     vkUpdateDescriptorSets(vkResources.device, updates.size(), updates.data(), 0, nullptr);
@@ -1153,7 +1187,7 @@ void Renderer::CreateBasicGraphicsLayout(
     VkDescriptorSetLayout* setLayout, 
     VkPipelineLayout* pipelineLayout)
 {
-    VkDescriptorSetLayoutBinding bindings[3] = {};
+    VkDescriptorSetLayoutBinding bindings[4] = {};
     bindings[0].binding = 0;
     bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
     bindings[0].descriptorCount = 1;
@@ -1172,9 +1206,15 @@ void Renderer::CreateBasicGraphicsLayout(
     bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
     bindings[2].pImmutableSamplers = nullptr;
 
+    bindings[3].binding = 3;
+    bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[3].descriptorCount = 1;
+    bindings[3].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings[3].pImmutableSamplers = nullptr;
+
     VkDescriptorSetLayoutCreateInfo descSetLayoutInfo = {};
     descSetLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    descSetLayoutInfo.bindingCount = 3;
+    descSetLayoutInfo.bindingCount = 4;
     descSetLayoutInfo.pBindings = bindings;
     EXIT_ON_VK_ERROR(vkCreateDescriptorSetLayout(vkResources.device, &descSetLayoutInfo, nullptr, setLayout));
 

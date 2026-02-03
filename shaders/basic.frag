@@ -30,6 +30,8 @@ layout(binding = 1) uniform  ObjectTransform
 } objectTransform;
 
 layout(binding = 2) uniform sampler2D smp[TEXTURE_COUNT];
+layout(binding = 3) uniform sampler2D shadowmap;
+
 
 layout(location = 0) in vec3 faceNormal;
 layout(location = 1) in vec2 texCoord; 
@@ -48,4 +50,9 @@ void main()
     outColor = texture(smp[objectTransform.objInfo.x], texCoord);
     outColor.rgb = (diffuseLight + ambientLight) * outColor.rgb;
     outColor.rgb = pow(outColor.rgb, vec3(1.0/GAMMA_F));
+
+    float dist = texture(shadowmap, texCoord).r;
+
+    outColor.a = 1;
+    outColor.rgb = vec3(dist, dist, dist);
 }
