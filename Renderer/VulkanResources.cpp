@@ -69,7 +69,7 @@ int64_t createVulkanResources(
 
 	vkResources->swapchainFramebuffers = createFramebuffers(vkResources->device, vkResources->renderPass, vkResources->shadowPass,
 		vkResources->depthImageView, vkResources->shadowmapTexture.depthImageView, textureViews, vkResources->swapchainInfo);
-	vkResources->shadowFramebuffer = vkResources->swapchainFramebuffers[0];
+	vkResources->shadowFramebuffer = vkResources->swapchainFramebuffers.back();
 	vkResources->swapchainFramebuffers.pop_back();
 
 	VkSemaphoreCreateInfo semaphoreInfo{};

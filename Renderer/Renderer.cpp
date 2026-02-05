@@ -129,7 +129,7 @@ void Renderer::BeginShadowPass()
     EXIT_ON_VK_ERROR(vkResetCommandBuffer(vkResources.cmdBuffer, 0));
     EXIT_ON_VK_ERROR(vkBeginCommandBuffer(vkResources.cmdBuffer, &cmdBuffInfo));
 
-    vkCmdBeginRenderPass(vkResources.cmdBuffer, &renderPassInfos[imageIndex], VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBeginRenderPass(vkResources.cmdBuffer, &shadowPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
     VkViewport viewport{};
     viewport.x = 0.0f;
@@ -149,7 +149,9 @@ void Renderer::BeginShadowPass()
 
 void Renderer::BeginRenderPass()
 {
-    vkCmdNextSubpass(vkResources.cmdBuffer, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdEndRenderPass(vkResources.cmdBuffer);
+
+    vkCmdBeginRenderPass(vkResources.cmdBuffer, &renderPassInfos[imageIndex], VK_SUBPASS_CONTENTS_INLINE);
 
     VkViewport viewport{};
     viewport.x = 0.0f;
@@ -628,7 +630,7 @@ void Renderer::CreateControllingStructs()
     shadowPassInfo.renderArea.offset = { 0, 0 };
     shadowPassInfo.renderArea.extent = vkResources.swapchainInfo.capabilities.currentExtent;
     shadowPassInfo.clearValueCount = 1;
-    shadowPassInfo.pClearValues = clearColor + 2;
+    shadowPassInfo.pClearValues = &clearColor[2];
 
     transferBarriers.resize(vkResources.swapchainImages.size() * 2);
     restoreBarriers.resize(vkResources.swapchainImages.size() * 2);
@@ -1385,7 +1387,7 @@ void Renderer::CreateBasicGraphicsVkPipeline(
     pipelineInfo.pColorBlendState = &blendInfo;
     pipelineInfo.pDynamicState = &dynamicState;
     pipelineInfo.layout = pipelineLayout;
-    pipelineInfo.renderPass = vkResources.renderPass;
+    pipelineInfo.renderPass =  isShadowPipeline ? vkResources.shadowPass : vkResources.renderPass;
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.basePipelineIndex = -1;

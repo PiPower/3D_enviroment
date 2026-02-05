@@ -51,8 +51,8 @@ void main()
     outColor.rgb = (diffuseLight + ambientLight) * outColor.rgb;
     outColor.rgb = pow(outColor.rgb, vec3(1.0/GAMMA_F));
 
-    float dist = texture(shadowmap, texCoord).r;
+    //float dist = texture(shadowmap, texCoord).r;
 
-    outColor.a = 1;
-    outColor.rgb = vec3(dist, dist, dist);
+    //outColor.a = 1;
+    //outColor.rgb = vec3(dist, dist, dist);
 }
