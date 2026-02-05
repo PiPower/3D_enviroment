@@ -138,6 +138,7 @@ private:
 	AllocatedBuffer stagingBuffer;
 	uint64_t skyboxPipelineId;
 	char* stagingPtr;
+	VkRenderPassBeginInfo shadowPassInfo;
 	std::vector<VkRenderPassBeginInfo> renderPassInfos;
 	std::vector<VkImageMemoryBarrier> transferBarriers;
 	std::vector<VkImageMemoryBarrier> restoreBarriers;

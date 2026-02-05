@@ -74,6 +74,9 @@ static VkRenderPass createRenderPass(
 	VkDevice device,
 	VkFormat imgFormat);
 
+static VkRenderPass createShadowPass(
+	VkDevice device);
+
 static DepthBufferBundle createDepthBuffer(
 	VkDevice device,
 	VkPhysicalDevice physicalDevice,
@@ -84,6 +87,7 @@ static DepthBufferBundle createDepthBuffer(
 static std::vector<VkFramebuffer> createFramebuffers(
 	VkDevice device,
 	VkRenderPass renderPass,
+	VkRenderPass shadowPass,
 	VkImageView	depthView,
 	VkImageView shadowmapView,
 	const std::vector<VkImageView> imgViews,

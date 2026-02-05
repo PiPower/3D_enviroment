@@ -603,7 +603,7 @@ cleanup:
 
 void Renderer::CreateControllingStructs()
 {
-    static 	VkClearValue clearColor[2];
+    static 	VkClearValue clearColor[3];
     clearColor[2].depthStencil = { 1.0f, 0 };
     clearColor[1].color = { {0.3f, 0.3f, 1.0f, 1.0f} };
     clearColor[0].depthStencil = { 1.0f, 0 };
@@ -617,9 +617,18 @@ void Renderer::CreateControllingStructs()
         renderPassInfos[i].framebuffer = vkResources.swapchainFramebuffers[i];
         renderPassInfos[i].renderArea.offset = { 0, 0 };
         renderPassInfos[i].renderArea.extent = vkResources.swapchainInfo.capabilities.currentExtent;
-        renderPassInfos[i].clearValueCount = 3;
+        renderPassInfos[i].clearValueCount = 2;
         renderPassInfos[i].pClearValues = clearColor;
     }
+
+    shadowPassInfo = {};
+    shadowPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    shadowPassInfo.renderPass = vkResources.shadowPass;
+    shadowPassInfo.framebuffer = vkResources.shadowFramebuffer;
+    shadowPassInfo.renderArea.offset = { 0, 0 };
+    shadowPassInfo.renderArea.extent = vkResources.swapchainInfo.capabilities.currentExtent;
+    shadowPassInfo.clearValueCount = 1;
+    shadowPassInfo.pClearValues = clearColor + 2;
 
     transferBarriers.resize(vkResources.swapchainImages.size() * 2);
     restoreBarriers.resize(vkResources.swapchainImages.size() * 2);
@@ -1139,7 +1148,7 @@ void Renderer::CreateSkyboxPipeline(
     pipelineInfo.pDynamicState = &dynamicState;
     pipelineInfo.layout = skyboxPipeline->pipelineLayout;
     pipelineInfo.renderPass = vkResources.renderPass;
-    pipelineInfo.subpass = 1;
+    pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.basePipelineIndex = -1;
 
@@ -1377,7 +1386,7 @@ void Renderer::CreateBasicGraphicsVkPipeline(
     pipelineInfo.pDynamicState = &dynamicState;
     pipelineInfo.layout = pipelineLayout;
     pipelineInfo.renderPass = vkResources.renderPass;
-    pipelineInfo.subpass = isShadowPipeline ? 0 : 1;
+    pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.basePipelineIndex = -1;
 

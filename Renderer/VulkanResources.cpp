@@ -58,6 +58,7 @@ int64_t createVulkanResources(
 	vkResources->cmdBuffer = cmdBuffs[0];
 	vkResources->sideCmdBuffer = cmdBuffs[1];
 	vkResources->renderPass = createRenderPass(vkResources->device, VK_FORMAT_R8G8B8A8_UNORM);
+	vkResources->shadowPass = createShadowPass(vkResources->device);
 	DepthBufferBundle bundle = createDepthBuffer(vkResources->device, vkResources->physicalDevice, 
 			vkResources->swapchainInfo.capabilities.currentExtent.width, vkResources->swapchainInfo.capabilities.currentExtent.height);
 	vkResources->depthImage = bundle.depthImage;
@@ -66,8 +67,10 @@ int64_t createVulkanResources(
 	vkResources->shadowmapTexture = createDepthBuffer(vkResources->device, vkResources->physicalDevice,
 		vkResources->swapchainInfo.capabilities.currentExtent.width, vkResources->swapchainInfo.capabilities.currentExtent.height, true);
 
-	vkResources->swapchainFramebuffers = createFramebuffers(vkResources->device, vkResources->renderPass,
+	vkResources->swapchainFramebuffers = createFramebuffers(vkResources->device, vkResources->renderPass, vkResources->shadowPass,
 		vkResources->depthImageView, vkResources->shadowmapTexture.depthImageView, textureViews, vkResources->swapchainInfo);
+	vkResources->shadowFramebuffer = vkResources->swapchainFramebuffers[0];
+	vkResources->swapchainFramebuffers.pop_back();
 
 	VkSemaphoreCreateInfo semaphoreInfo{};
 	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -101,6 +104,22 @@ int64_t createVulkanResources(
 	depthBarrier.subresourceRange.levelCount = 1;
 	depthBarrier.subresourceRange.baseArrayLayer = 0;
 	depthBarrier.subresourceRange.layerCount = 1;
+
+	VkImageMemoryBarrier shadowmapBarrier = {};
+	shadowmapBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	shadowmapBarrier.srcAccessMask = 0;
+	shadowmapBarrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	shadowmapBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	shadowmapBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	shadowmapBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	shadowmapBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	shadowmapBarrier.image = vkResources->shadowmapTexture.depthImage;
+	shadowmapBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	shadowmapBarrier.subresourceRange.baseMipLevel = 0;
+	shadowmapBarrier.subresourceRange.levelCount = 1;
+	shadowmapBarrier.subresourceRange.baseArrayLayer = 0;
+	shadowmapBarrier.subresourceRange.layerCount = 1;
+
 
 	vector<VkImageMemoryBarrier> barriers;
 	barriers.resize(1 + vkResources->swapchainImages.size() * 2);
@@ -976,16 +995,7 @@ static VkRenderPass createRenderPass(
 	VkFormat imgFormat)
 {
 	VkRenderPass renderPass;
-	VkAttachmentDescription attachmentDesc[3] = {};
-
-	attachmentDesc[2].format = VK_FORMAT_D32_SFLOAT;
-	attachmentDesc[2].samples = VK_SAMPLE_COUNT_1_BIT;
-	attachmentDesc[2].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	attachmentDesc[2].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-	attachmentDesc[2].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	attachmentDesc[2].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	attachmentDesc[2].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	attachmentDesc[2].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+	VkAttachmentDescription attachmentDesc[2] = {};
 	
 	attachmentDesc[1].format = imgFormat;
 	attachmentDesc[1].samples = VK_SAMPLE_COUNT_1_BIT;
@@ -1008,57 +1018,88 @@ static VkRenderPass createRenderPass(
 	VkAttachmentReference colorAttachmentRef{};
 	colorAttachmentRef.attachment = 1;
 	colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-	VkAttachmentReference depthAttachmentRef[2] = {};
-	depthAttachmentRef[1].attachment = 2;
-	depthAttachmentRef[1].layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	VkAttachmentReference depthAttachmentRef = {};
+	depthAttachmentRef.attachment = 0;
+	depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-	depthAttachmentRef[0].attachment = 0;
-	depthAttachmentRef[0].layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	VkSubpassDescription subpass = {};
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass.colorAttachmentCount = 1;
+	subpass.pColorAttachments = &colorAttachmentRef;
+	subpass.pDepthStencilAttachment = &depthAttachmentRef;
 
-	VkSubpassDescription subpass[2] = {};
-	subpass[1].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-	subpass[1].colorAttachmentCount = 1;
-	subpass[1].pColorAttachments = &colorAttachmentRef;
-	subpass[1].pDepthStencilAttachment = &depthAttachmentRef[0];
-
-	subpass[0].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-	subpass[0].pDepthStencilAttachment = &depthAttachmentRef[1];
-
-	VkSubpassDependency dependency[3] = {};
-
-	dependency[2].srcSubpass = 0;
-	dependency[2].dstSubpass = VK_SUBPASS_EXTERNAL;
-	dependency[2].srcStageMask = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-	dependency[2].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-	dependency[2].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-	dependency[2].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
+	VkSubpassDependency dependency[2] = {};
 	dependency[1].srcSubpass = VK_SUBPASS_EXTERNAL;
-	dependency[1].dstSubpass = 1;
-	dependency[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-	dependency[1].srcAccessMask = 0;
-	dependency[1].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-	dependency[1].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	dependency[1].dstSubpass = 0;
+	dependency[1].srcStageMask = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+	dependency[1].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	dependency[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	dependency[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
 	dependency[0].srcSubpass = VK_SUBPASS_EXTERNAL;
 	dependency[0].dstSubpass = 0;
-	dependency[0].srcStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+	dependency[0].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
 	dependency[0].srcAccessMask = 0;
-	dependency[0].dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-	dependency[0].dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	dependency[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+	dependency[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
 
 	VkRenderPassCreateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	info.attachmentCount = 3;
+	info.attachmentCount = 2;
 	info.pAttachments = attachmentDesc;
-	info.subpassCount = 2;
-	info.pSubpasses = subpass;
-	info.dependencyCount = 3;
+	info.subpassCount = 1;
+	info.pSubpasses = &subpass;
+	info.dependencyCount = 2;
 	info.pDependencies = dependency;
 
 	EXIT_ON_VK_ERROR(vkCreateRenderPass(device, &info, nullptr, &renderPass));
 
 	return renderPass;
+}
+
+VkRenderPass createShadowPass(
+	VkDevice device)
+{
+	VkAttachmentDescription shadowAttachment = {};
+	shadowAttachment.format = VK_FORMAT_D32_SFLOAT;
+	shadowAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+	shadowAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	shadowAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	shadowAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	shadowAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	shadowAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	shadowAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+
+	VkAttachmentReference depthAttachmentRef = {};
+	depthAttachmentRef.attachment = 0;
+	depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+	VkSubpassDescription subpass = {};
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass.pDepthStencilAttachment = &depthAttachmentRef;
+
+	VkSubpassDependency dependency = {};
+	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependency.dstSubpass = 0;
+	dependency.srcStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+	dependency.srcAccessMask = 0;
+	dependency.dstStageMask =  VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+	dependency.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+	VkRenderPassCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	info.attachmentCount = 1;
+	info.pAttachments = &shadowAttachment;
+	info.subpassCount = 1;
+	info.pSubpasses = &subpass;
+	info.dependencyCount = 1;
+	info.pDependencies = &dependency;
+
+	VkRenderPass shadowPass;
+	EXIT_ON_VK_ERROR(vkCreateRenderPass(device, &info, nullptr, &shadowPass));
+
+	return shadowPass;
 }
 
 static DepthBufferBundle createDepthBuffer(
@@ -1120,25 +1161,37 @@ static DepthBufferBundle createDepthBuffer(
 static std::vector<VkFramebuffer> createFramebuffers(
 	VkDevice device,
 	VkRenderPass renderPass, 
+	VkRenderPass shadowPass,
 	VkImageView depthView,
 	VkImageView shadowmapView,
 	const std::vector<VkImageView> imgViews,
 	const SwapchainInfo& swcInfo)
 {
-	vector<VkFramebuffer> framebuffers(imgViews.size());
+	vector<VkFramebuffer> framebuffers(imgViews.size() + 1);
 	for (size_t i = 0; i < imgViews.size(); i++)
 	{
-		VkImageView views[3] = {depthView, imgViews[i], shadowmapView };
+		VkImageView views[3] = {depthView, imgViews[i]};
 
 		VkFramebufferCreateInfo info = {};
 		info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 		info.renderPass = renderPass;
-		info.attachmentCount = 3;
+		info.attachmentCount = 2;
 		info.pAttachments = views;
 		info.width = swcInfo.capabilities.currentExtent.width;
 		info.height = swcInfo.capabilities.currentExtent.height;
 		info.layers = 1;
 		EXIT_ON_VK_ERROR(vkCreateFramebuffer(device, &info, nullptr, &framebuffers[i]));
 	}
+
+	VkFramebufferCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+	info.renderPass = shadowPass;
+	info.attachmentCount = 1;
+	info.pAttachments = &shadowmapView;
+	info.width = swcInfo.capabilities.currentExtent.width;
+	info.height = swcInfo.capabilities.currentExtent.height;
+	info.layers = 1;
+	EXIT_ON_VK_ERROR(vkCreateFramebuffer(device, &info, nullptr, &framebuffers[framebuffers.size() - 1]));
+
 	return framebuffers;
 }

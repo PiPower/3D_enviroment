@@ -77,6 +77,7 @@ struct VulkanResources
 	std::vector<VkImage> swapchainImages;
 	std::vector<VkImageView> swapchainImageViews;
 	std::vector<VkFramebuffer> swapchainFramebuffers;
+	VkFramebuffer shadowFramebuffer;
 	DepthBufferBundle shadowmapTexture;
 	VkImage depthImage;
 	VkDeviceMemory depthImageMemory;
@@ -85,6 +86,7 @@ struct VulkanResources
 	VkCommandBuffer sideCmdBuffer;
 	VkCommandBuffer cmdBuffer;
 	VkRenderPass renderPass;
+	VkRenderPass shadowPass;
 	VkSemaphore imgReady;
 	VkSemaphore renderingFinished;
 	VkFence gfxQueueFinished;
