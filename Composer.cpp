@@ -33,21 +33,21 @@ Composer::Composer(
     orientationDir({ 1, 0, 0 }), forwardDir({ 1, 0, 0 }), upDir({ 0,1,0 }), rightDir({ 0,0,-1 }),
     characterVelocityCoeff({ 70000, 70000, 70000 }), freeFall(true), scalesVel({1.0f, 1.0f, 1.0f})
 {
-    lights = { Light{{1, 1, 1, 1.0f}, {0.0f, 50.0f, 0.0f, 0.2f} } };
+    lights = { Light{{1, 1, 1, 1.0f}, {0.0f, 100.0f, 0.0f, 0.05f} } };
     vector<TextureDim> dims(10, TextureDim{ 300, 300});
+    VkDeviceSize globalUboSize = sizeof(Camera) + lights.size() * sizeof(Light) + lights.size() * sizeof(XMFLOAT4X4);
+    vector<GeometryEntry> boxGeo({ GeometryType::Box });
 
     renderer->CreateGraphicsPipeline(0, {}, &shadowmapPipelineId, true);
     renderer->CreateGraphicsPipeline(lights.size(), dims ,&pipelineId);
-
-    vector<GeometryEntry> boxGeo({ GeometryType::Box });
     renderer->CreateMeshCollection(boxGeo, &boxCollection);
-    renderer->CreateUboPool(sizeof(Camera) + lights.size() * sizeof(Light), sizeof(ObjectUbo), 300'000, &uboPool);
+    renderer->CreateUboPool(globalUboSize, sizeof(ObjectUbo), 300'000, &uboPool);
     renderer->AllocateUboResource(uboPool, UBO_GLOBAL_RESOURCE_TYPE, &shadowmapGlobalUbo);
     renderer->AllocateUboResource(uboPool, UBO_GLOBAL_RESOURCE_TYPE, &globalUbo);
     renderer->BindUboPoolToPipeline(shadowmapPipelineId, uboPool, shadowmapGlobalUbo);
     renderer->BindUboPoolToPipeline(pipelineId, uboPool, globalUbo);
 
-    globalUboBuffer = new char[sizeof(Camera) + lights.size() * sizeof(Light)];
+    globalUboBuffer = new char[globalUboSize];
     shadowmapUboBuffer = new char[sizeof(Camera) + lights.size() * sizeof(Light)];
 
     UpdateShadowmapGlobalBuffer();
@@ -469,8 +469,15 @@ void Composer::ProcessUserInput(
 
 void Composer::UpdateGlobalBuffer()
 {
+    XMFLOAT4X4 lightTransform;
+    XMMATRIX viewLight = XMLoadFloat4x4((XMFLOAT4X4*)shadowmapUboBuffer);
+    XMMATRIX projLight = XMLoadFloat4x4((XMFLOAT4X4*)(shadowmapUboBuffer  + sizeof(XMFLOAT4X4)));
+    XMStoreFloat4x4(&lightTransform, viewLight * projLight);
+
     memcpy(globalUboBuffer + sizeof(Camera), lights.data(), lights.size() * sizeof(Light));
     
+    memcpy(globalUboBuffer + sizeof(Camera) + lights.size() * sizeof(Light), &lightTransform, sizeof(XMFLOAT4X4));
+
     XMFLOAT4X4 proj;
     XMStoreFloat4x4(&proj, XMMatrixPerspectiveFovLH(3.14f / 4.0f, 1600.0f / 900.0f, 0.1f, 128.0f));
     proj._22 *= -1.0f;// vulkan has -1.0f on top and 1.0f on bottom
@@ -481,14 +488,12 @@ void Composer::UpdateGlobalBuffer()
 void Composer::UpdateShadowmapGlobalBuffer()
 {
     XMFLOAT4X4 proj;
-    XMStoreFloat4x4(&proj, XMMatrixOrthographicLH(20, 20, 0.1f, 128.0f));
+    XMStoreFloat4x4(&proj, XMMatrixOrthographicLH(140, 140, 0.1f, 128.0f));
     proj._22 *= -1.0f;// vulkan has -1.0f on top and 1.0f on bottom
     memcpy(shadowmapUboBuffer + sizeof(XMFLOAT4X4), &proj, sizeof(XMFLOAT4X4));
-    XMVECTOR lightPos = XMLoadFloat4(&lights[0].pos);
-    XMVECTOR lightDir = XMVectorSet(0, -1, 0 ,0 );
-    XMVECTOR lightUp = XMVectorSet(1, 0, 0, 0);
+
     XMFLOAT4X4 view;
-    XMStoreFloat4x4(&view, XMMatrixLookToLH(lightPos, lightDir, lightUp));
+    GetLightViewMatrix(&view);
 
     memcpy(shadowmapUboBuffer, &view, sizeof(XMFLOAT4X4));
     renderer->UpdateUboMemory(uboPool, shadowmapGlobalUbo, shadowmapUboBuffer);
@@ -584,4 +589,13 @@ void Composer::UpdateMovementVectors()
         }
     }
 
+}
+
+void Composer::GetLightViewMatrix(
+    DirectX::XMFLOAT4X4* lightViewMatrix)
+{
+    XMVECTOR lightPos = XMLoadFloat4(&lights[0].pos);
+    XMVECTOR lightDir = XMVector3Normalize(XMVectorSet(0, -1, 0, 0));
+    XMVECTOR lightUp = XMVectorSet(1, 0, 0, 0);
+    XMStoreFloat4x4(lightViewMatrix, XMMatrixLookToLH(lightPos, lightDir, lightUp));
 }

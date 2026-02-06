@@ -20,6 +20,7 @@ layout(binding = 0) uniform Globals
     mat4 view;
     mat4 proj;
     Light lights[LIGHT_COUNT]; // (R, G, B, Intensity);
+    mat4 lightView[LIGHT_COUNT];
 } global;
 
 
@@ -36,23 +37,32 @@ layout(binding = 3) uniform sampler2D shadowmap;
 layout(location = 0) in vec3 faceNormal;
 layout(location = 1) in vec2 texCoord; 
 layout(location = 2) in vec4 worldPos;
+layout(location = 3) in vec4 worldPosLightCoord;
 
 
 layout(location = 0) out vec4 outColor;
+
+float ShadowCalculation(vec4 fragPosLightSpace)
+{
+    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+    projCoords.xy = projCoords.xy * 0.5 + 0.5;
+    float closestDepth = texture(shadowmap, projCoords.xy).r; 
+    float currentDepth = projCoords.z;
+    float shadow = currentDepth > closestDepth  ? 1.0 : 0.0;  
+
+    return shadow;
+}
+
 void main()
 {
-
     vec3 lightVec = normalize(global.lights[0].pos.xyz - worldPos.xyz);
     float diffCoeff = max(dot(normalize(faceNormal), lightVec), 0.0);
     vec3 diffuseLight = diffCoeff * global.lights[0].color.rgb;
     vec3 ambientLight = global.lights[0].pos.w * global.lights[0].color.rgb;
+    float shadow = ShadowCalculation(worldPosLightCoord);  
 
     outColor = texture(smp[objectTransform.objInfo.x], texCoord);
-    outColor.rgb = (diffuseLight + ambientLight) * outColor.rgb;
+    outColor.rgb = ((1.0f - shadow) * diffuseLight + ambientLight) * outColor.rgb;
     outColor.rgb = pow(outColor.rgb, vec3(1.0/GAMMA_F));
 
-    //float dist = texture(shadowmap, texCoord).r;
-
-    //outColor.a = 1;
-    //outColor.rgb = vec3(dist, dist, dist);
 }

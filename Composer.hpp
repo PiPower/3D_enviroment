@@ -70,6 +70,9 @@ struct Composer
 		const DirectX::XMFLOAT3& constForce = { 0, -15, 0 });
 
 	void UpdateMovementVectors();
+
+	void GetLightViewMatrix(
+		DirectX::XMFLOAT4X4* lightViewMatrix);
 public:
 	Renderer* renderer;
 	PhysicsEnigne* physicsEngine;
