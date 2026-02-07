@@ -33,7 +33,7 @@ Composer::Composer(
     orientationDir({ 1, 0, 0 }), forwardDir({ 1, 0, 0 }), upDir({ 0,1,0 }), rightDir({ 0,0,-1 }),
     characterVelocityCoeff({ 70000, 70000, 70000 }), freeFall(true), scalesVel({1.0f, 1.0f, 1.0f})
 {
-    lights = { Light{{1, 1, 1, 1.0f}, {0.0f, 100.0f, 0.0f, 0.05f} } };
+    lights = { Light{{1, 1, 1, 1.0f}, {-40.0f, 20.0f, 0.0f, 0.05f} } };
     vector<TextureDim> dims(10, TextureDim{ 300, 300});
     VkDeviceSize globalUboSize = sizeof(Camera) + lights.size() * sizeof(Light) + lights.size() * sizeof(XMFLOAT4X4);
     vector<GeometryEntry> boxGeo({ GeometryType::Box });
@@ -236,7 +236,7 @@ void Composer::GenerateObjects()
         bodyProps.rotation = { 0, 0, 0, 1 };
         bodyProps.elasticity = 1.0f;
         bodyProps.friction = 0.01f;
-        XMFLOAT3 scales = { 1, 20, 35 };
+        XMFLOAT3 scales = { 1, 20, 39 };
         XMUINT4 objInfo = { 3, 0, 0 ,0 };
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
         AddBody(ShapeType::OrientedBox, bodyProps, scales, objInfo, bounds, true);
@@ -324,6 +324,22 @@ void Composer::GenerateObjects()
         LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
         AddBody(ShapeType::OrientedBox, bodyProps, scales, objInfo, bounds, true);
         AddWalkableCuboid(physicsEntities.back(), w_top);
+    }
+
+    // rotated box
+    {
+        BodyProperties bodyProps;
+        bodyProps.position = { -15, 14, 0 };
+        bodyProps.linVelocity = { 0, 0, 0 };
+        bodyProps.angVelocity = { 0, 0, 0 };
+        bodyProps.massInv = 0;
+        bodyProps.rotation = { 0.4364358, 0.8728716, 0.2182179, 0.7 };
+        bodyProps.elasticity = 1.0f;
+        bodyProps.friction = 0.01f;
+        XMFLOAT3 scales = { 1.4, 1.4, 1.4 };
+        XMUINT4 objInfo = { 5, 0, 0 ,0 };
+        LinearVelocityBounds bounds = { -1000, 1000, -1000, 1000, -1000, 1000 };
+        AddBody(ShapeType::OrientedBox, bodyProps, scales, objInfo, bounds, false);
     }
 
 }
@@ -488,7 +504,7 @@ void Composer::UpdateGlobalBuffer()
 void Composer::UpdateShadowmapGlobalBuffer()
 {
     XMFLOAT4X4 proj;
-    XMStoreFloat4x4(&proj, XMMatrixOrthographicLH(140, 140, 0.1f, 128.0f));
+    XMStoreFloat4x4(&proj, XMMatrixOrthographicLH(80, 80, 0.1f, 128.0f));
     proj._22 *= -1.0f;// vulkan has -1.0f on top and 1.0f on bottom
     memcpy(shadowmapUboBuffer + sizeof(XMFLOAT4X4), &proj, sizeof(XMFLOAT4X4));
 
@@ -595,7 +611,7 @@ void Composer::GetLightViewMatrix(
     DirectX::XMFLOAT4X4* lightViewMatrix)
 {
     XMVECTOR lightPos = XMLoadFloat4(&lights[0].pos);
-    XMVECTOR lightDir = XMVector3Normalize(XMVectorSet(0, -1, 0, 0));
-    XMVECTOR lightUp = XMVectorSet(1, 0, 0, 0);
+    XMVECTOR lightDir = XMVector3Normalize(XMVectorSet(1, -1, 0, 0));
+    XMVECTOR lightUp = XMVector3Cross(XMVectorSet(1, 0, 0, 0), lightDir);
     XMStoreFloat4x4(lightViewMatrix, XMMatrixLookToLH(lightPos, lightDir, lightUp));
 }
