@@ -537,7 +537,7 @@ void Composer::UpdateMovementVectors()
         float dist;
         XMFLOAT3 ptOnCharacter, ptOnSurface;
         physicsEngine->GetDistanceBetweenBodies(characterId, walkableCuboids[j].bodyId, &ptOnCharacter, &ptOnSurface, &dist);
-        if (dist < projection.dist)
+        if (dist > 0.0f &&  dist < projection.dist)
         {
             projection.dist = dist;
             projection.ptOnSurfA = ptOnCharacter;
